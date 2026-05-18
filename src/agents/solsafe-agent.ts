@@ -45,7 +45,7 @@ export const SOLSAFE_MEMORY_KEY = 'history';
 export const SOLSAFE_INPUT_KEY = 'input';
 export const SOLSAFE_OUTPUT_KEY = 'output';
 export const SOLSAFE_DYOR_DISCLAIMER =
-  'Always DYOR. This is not financial advice.';
+  'Always DYOR — this is not financial advice.';
 
 export const SOLSAFE_INTENTS = {
   NATURAL_LANGUAGE_SWAP: 'natural_language_swap',
