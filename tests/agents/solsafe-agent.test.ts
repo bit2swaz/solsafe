@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  SOLSAFE_INTENTS,
   SOLSAFE_MEMORY_KEY,
   createSolsafeAgent,
   createSolsafeMemory,
@@ -22,5 +23,19 @@ describe('solsafe agent', () => {
     const agent = createSolsafeAgent({ memory });
 
     expect(agent.memory).toBe(memory);
+  });
+
+  it.each([
+    ['check wallet 8vFzXabc123', SOLSAFE_INTENTS.WALLET_LOOKUP],
+    ['what about the BONK token? is it safe?', SOLSAFE_INTENTS.TOKEN_SECURITY],
+    [
+      'can you simulate this transaction before i sign it?',
+      SOLSAFE_INTENTS.TRANSACTION_SIMULATION,
+    ],
+    ['hello there', SOLSAFE_INTENTS.UNKNOWN],
+  ])('routes "%s" to %s', (message, expectedIntent) => {
+    const agent = createSolsafeAgent();
+
+    expect(agent.routeIntent(message)).toBe(expectedIntent);
   });
 });
