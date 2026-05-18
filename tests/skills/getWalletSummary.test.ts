@@ -41,6 +41,7 @@ describe('getWalletSummary skill', () => {
         `Wallet ${walletAddress} has been active for 234 days.`,
         'Current balance: 12.4 SOL, 1,200 USDC, and 50k BONK.',
         'Last transaction: 2 hours ago (sent 0.1 SOL to Jupiter).',
+        'Risk assessment: No interactions with known scam contracts. ✅',
       ].join('\n'),
       data: {
         walletAddress,

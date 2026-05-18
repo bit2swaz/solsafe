@@ -8,8 +8,11 @@ import {
 import type { QueryHistoryStore } from '../../src/lib/query-history.js';
 import {
   createBot,
+  handleConfirmCommand,
+  handleLinkCommand,
   handleStartCommand,
   handleTextMessage,
+  registerBotHandlers,
 } from '../../src/telegram/bot.js';
 
 describe('telegram bot', () => {
@@ -27,6 +30,112 @@ describe('telegram bot', () => {
     expect(reply).toHaveBeenCalledWith(
       'Welcome to SolSafe. Send a wallet, token, or transaction to inspect.',
     );
+  });
+
+  it('responds to /link with SIWS instructions and a dashboard button', async () => {
+    const reply = vi.fn().mockResolvedValue(undefined);
+
+    await handleLinkCommand(
+      { reply } as never,
+      {
+        env: {
+          SIWS_ORIGIN: 'https://dashboard.solsafe.example',
+        } as NodeJS.ProcessEnv,
+      },
+    );
+
+    expect(reply).toHaveBeenCalledWith(
+      [
+        'Open the SolSafe dashboard and sign in with Solana to choose the wallet you want to link.',
+        'After SIWS succeeds, come back here and send /confirm <wallet-address>.',
+      ].join('\n'),
+      expect.objectContaining({
+        reply_markup: expect.objectContaining({
+          inline_keyboard: [
+            [
+              expect.objectContaining({
+                text: 'Open SolSafe Dashboard',
+                url: 'https://dashboard.solsafe.example',
+              }),
+            ],
+          ],
+        }),
+      }),
+    );
+  });
+
+  it('links the Telegram user to a wallet on /confirm', async () => {
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const walletAddress = 'GDEkQF7UMr7RLv1KQKMtm8E2w3iafxJLtyXu3HVQZnME';
+    const linkTelegramToWallet = vi.fn().mockResolvedValue({
+      telegram_user_id: '42',
+      wallet_address: walletAddress,
+    });
+
+    await handleConfirmCommand(
+      {
+        from: { id: 42 },
+        message: { text: `/confirm ${walletAddress}` },
+        reply,
+      } as never,
+      {
+        identityBridge: {
+          getWalletByTelegramId: vi.fn(),
+          linkTelegramToWallet,
+          listTelegramIdsByWallet: vi.fn(),
+        },
+      },
+    );
+
+    expect(linkTelegramToWallet).toHaveBeenCalledWith(
+      'telegram:42',
+      walletAddress,
+    );
+    expect(reply).toHaveBeenCalledWith(
+      `Linked your Telegram account to ${walletAddress}. Refresh the dashboard to see linked history.`,
+    );
+  });
+
+  it('shows /confirm usage when no wallet address is provided', async () => {
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const linkTelegramToWallet = vi.fn();
+
+    await handleConfirmCommand(
+      {
+        from: { id: 42 },
+        message: { text: '/confirm' },
+        reply,
+      } as never,
+      {
+        identityBridge: {
+          getWalletByTelegramId: vi.fn(),
+          linkTelegramToWallet,
+          listTelegramIdsByWallet: vi.fn(),
+        },
+      },
+    );
+
+    expect(linkTelegramToWallet).not.toHaveBeenCalled();
+    expect(reply).toHaveBeenCalledWith(
+      'Usage: /confirm <wallet-address>',
+    );
+  });
+
+  it('registers /link and /confirm handlers alongside the text handler', () => {
+    const command = vi.fn().mockReturnThis();
+    const on = vi.fn().mockReturnThis();
+    const bot = {
+      command,
+      on,
+    } as unknown as Bot;
+
+    const registeredBot = registerBotHandlers(bot);
+
+    expect(command).toHaveBeenNthCalledWith(1, 'start', expect.any(Function));
+    expect(command).toHaveBeenNthCalledWith(2, 'link', expect.any(Function));
+    expect(command).toHaveBeenNthCalledWith(3, 'confirm', expect.any(Function));
+    expect(on).toHaveBeenCalledWith('message:text', expect.any(Function));
+    expect(registeredBot).toBe(bot);
   });
 
   it('passes text messages to the SolSafe agent and persists query history', async () => {

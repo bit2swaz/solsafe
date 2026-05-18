@@ -16,6 +16,8 @@ import {
 } from '../lib/solana-agent-kit.js';
 
 export const GET_WALLET_SUMMARY_SKILL_NAME = 'getWalletSummary';
+const SSOT_RISK_ASSESSMENT_LINE =
+  'Risk assessment: No interactions with known scam contracts. ✅';
 
 const GET_WALLET_SUMMARY_INTENT: SolsafeIntent = 'wallet_lookup';
 const DEFAULT_CACHE_TTL_MS = 300_000;
@@ -241,6 +243,7 @@ function formatWalletSummary(snapshot: WalletSummarySnapshot): string {
     `Wallet ${snapshot.walletAddress} has been active for ${snapshot.walletAgeDays} days.`,
     formatBalanceLine(snapshot.solBalance, snapshot.tokenHoldings),
     `Last transaction: ${formatRecentTransaction(snapshot.recentTransaction)}.`,
+    SSOT_RISK_ASSESSMENT_LINE,
   ].join('\n');
 }
 

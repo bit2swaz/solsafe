@@ -33,6 +33,7 @@ User: @SolBot check wallet 8vFzX...
 Bot:  Wallet 8vFzX... has been active for 234 days.
 	Current balance: 12.4 SOL, 1,200 USDC, and 50k BONK.
 	Last transaction: 2 hours ago (sent 0.1 SOL to Jupiter).
+	Risk assessment: No interactions with known scam contracts. ✅
 	Always DYOR — this is not financial advice.
 
 User: what about the BONK token? is it safe?
@@ -54,6 +55,14 @@ If you ask for whale alerts, wallet risk, or swaps, the public MVP will fall bac
 ### Dashboard
 
 Open the Next.js dashboard, sign in with Solana, and view the history linked to your wallet. Once a Telegram identity is linked to that wallet, real Telegram conversations appear in the dashboard history panel.
+
+To link a Telegram identity for MVP testing:
+
+```text
+1. In Telegram, send /link.
+2. Use the dashboard button, then complete SIWS in the dashboard.
+3. Return to Telegram and send /confirm <wallet-address>.
+```
 
 ## Prerequisites
 
@@ -85,6 +94,7 @@ Copy [.env.example](.env.example) into `.env` and set:
 - `GROQ_API_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SIWS_ORIGIN`
 - `WEBHOOK_URL`
 
 ### 3. Install dashboard dependencies
@@ -182,6 +192,7 @@ Required Render environment variables:
 - `GROQ_API_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SIWS_ORIGIN`
 
 ### Dashboard on Vercel free tier
 

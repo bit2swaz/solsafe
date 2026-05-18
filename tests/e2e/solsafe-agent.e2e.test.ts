@@ -104,6 +104,7 @@ describe('solsafe agent e2e flows', () => {
         `Wallet ${WALLET_ADDRESS} has been active for 234 days.`,
         'Current balance: 12.4 SOL, 1,200 USDC, and 50k BONK.',
         'Last transaction: 2 hours ago (sent 0.1 SOL to Jupiter).',
+        'Risk assessment: No interactions with known scam contracts. ✅',
         SOLSAFE_DYOR_DISCLAIMER,
       ].join('\n'),
     );
