@@ -11,6 +11,8 @@ import {
   startTelegramServer,
 } from '../../src/telegram/server.js';
 
+const WEBHOOK_SECRET = 'telegram-secret-token';
+
 const activeServers = new Set<Server>();
 
 afterEach(async () => {
@@ -53,6 +55,7 @@ describe('telegram webhook server', () => {
         res.statusCode = 200;
         res.end('ok');
       },
+      webhookSecret: WEBHOOK_SECRET,
       webhookUrl: 'https://example.com/telegram/webhook',
     });
 
@@ -70,19 +73,53 @@ describe('telegram webhook server', () => {
     });
 
     const webhookUrl = 'https://example.com/telegram/webhook';
-    const server = createTelegramServer({ webhookHandler, webhookUrl });
+    const server = createTelegramServer({
+      webhookHandler,
+      webhookSecret: WEBHOOK_SECRET,
+      webhookUrl,
+    });
 
     const baseUrl = await listen(server);
     const response = await fetch(`${baseUrl}${getWebhookPath(webhookUrl)}`, {
       body: JSON.stringify({ update_id: 1 }),
       headers: {
         'content-type': 'application/json',
+        'x-telegram-bot-api-secret-token': WEBHOOK_SECRET,
       },
       method: 'POST',
     });
 
     expect(response.status).toBe(200);
     expect(webhookHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects POST requests with an invalid Telegram webhook secret before handling the update', async () => {
+    const webhookHandler = vi.fn(async (_req, res) => {
+      res.statusCode = 200;
+      res.end('accepted');
+    });
+    const webhookUrl = 'https://example.com/telegram/webhook';
+    const server = createTelegramServer({
+      webhookHandler,
+      webhookSecret: WEBHOOK_SECRET,
+      webhookUrl,
+    });
+
+    const baseUrl = await listen(server);
+    const response = await fetch(`${baseUrl}${getWebhookPath(webhookUrl)}`, {
+      body: JSON.stringify({ update_id: 1 }),
+      headers: {
+        'content-type': 'application/json',
+        'x-telegram-bot-api-secret-token': 'bad-secret',
+      },
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'Invalid Telegram webhook secret.',
+    });
+    expect(webhookHandler).not.toHaveBeenCalled();
   });
 
   it('registers the webhook URL when the server starts', async () => {
@@ -99,11 +136,14 @@ describe('telegram webhook server', () => {
         res.statusCode = 200;
         res.end('accepted');
       },
+      webhookSecret: WEBHOOK_SECRET,
       webhookUrl,
     });
 
     activeServers.add(server);
 
-    expect(setWebhook).toHaveBeenCalledWith(webhookUrl);
+    expect(setWebhook).toHaveBeenCalledWith(webhookUrl, {
+      secret_token: WEBHOOK_SECRET,
+    });
   });
 });

@@ -1,8 +1,11 @@
+import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
 import { type Bot, webhookCallback } from 'grammy';
 
 import { createBot } from './bot.js';
+
+const TELEGRAM_WEBHOOK_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
 
 type WebhookHandler = (
   req: IncomingMessage,
@@ -12,6 +15,7 @@ type WebhookHandler = (
 type CreateTelegramServerOptions = {
   bot?: Bot;
   webhookHandler?: WebhookHandler;
+  webhookSecret?: string;
   webhookUrl?: string;
 };
 
@@ -40,6 +44,18 @@ export function getWebhookUrl(env: NodeJS.ProcessEnv = process.env): string {
   return webhookUrl;
 }
 
+export function getWebhookSecret(env: NodeJS.ProcessEnv = process.env): string {
+  const webhookSecret = env.TELEGRAM_WEBHOOK_SECRET?.trim() ?? '';
+
+  if (!webhookSecret) {
+    throw new Error(
+      'TELEGRAM_WEBHOOK_SECRET is required to configure the Telegram webhook',
+    );
+  }
+
+  return webhookSecret;
+}
+
 export function getWebhookPath(webhookUrl = getWebhookUrl()): string {
   return new URL(webhookUrl).pathname || '/';
 }
@@ -48,6 +64,7 @@ export function createTelegramServer(
   options: CreateTelegramServerOptions = {},
 ): Server {
   const webhookUrl = options.webhookUrl ?? getWebhookUrl();
+  const webhookSecret = options.webhookSecret ?? getWebhookSecret();
   const bot = options.bot ?? createBot();
   const webhookPath = getWebhookPath(webhookUrl);
   const handleWebhook =
@@ -67,6 +84,13 @@ export function createTelegramServer(
     }
 
     if (req.method === 'POST' && requestUrl.pathname === webhookPath) {
+      if (!hasValidTelegramWebhookSecret(req, webhookSecret)) {
+        res.statusCode = 403;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ error: 'Invalid Telegram webhook secret.' }));
+        return;
+      }
+
       try {
         await handleWebhook(req, res);
       } catch {
@@ -93,11 +117,13 @@ export async function startTelegramServer(
   options: StartTelegramServerOptions = {},
 ): Promise<Server> {
   const bot = options.bot ?? createBot();
+  const webhookSecret = options.webhookSecret ?? getWebhookSecret();
   const webhookUrl = options.webhookUrl ?? getWebhookUrl();
   const port = options.port ?? getPort();
   const server = createTelegramServer({
     bot,
     webhookHandler: options.webhookHandler,
+    webhookSecret,
     webhookUrl,
   });
 
@@ -110,7 +136,9 @@ export async function startTelegramServer(
   });
 
   try {
-    await bot.api.setWebhook(webhookUrl);
+    await bot.api.setWebhook(webhookUrl, {
+      secret_token: webhookSecret,
+    });
   } catch (error) {
     await new Promise<void>((resolve, reject) => {
       server.close((closeError) => {
@@ -127,4 +155,27 @@ export async function startTelegramServer(
   }
 
   return server;
+}
+
+function hasValidTelegramWebhookSecret(
+  req: IncomingMessage,
+  expectedSecret: string,
+): boolean {
+  const receivedSecretHeader = req.headers[TELEGRAM_WEBHOOK_SECRET_HEADER];
+  const receivedSecret = Array.isArray(receivedSecretHeader)
+    ? receivedSecretHeader[0] ?? ''
+    : receivedSecretHeader ?? '';
+
+  return safeCompareSecrets(receivedSecret, expectedSecret);
+}
+
+function safeCompareSecrets(receivedSecret: string, expectedSecret: string): boolean {
+  const receivedBuffer = Buffer.from(receivedSecret);
+  const expectedBuffer = Buffer.from(expectedSecret);
+
+  if (receivedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(receivedBuffer, expectedBuffer);
 }
