@@ -1,19 +1,26 @@
-import { createBot } from './telegram/bot.js';
+import { startTelegramServer } from './telegram/server.js';
 
-const bot = createBot();
+const server = await startTelegramServer();
 
-bot.catch((error) => {
-  console.error('SolSafe bot error', error.error);
-});
+const address = server.address();
+
+if (address && typeof address !== 'string') {
+  console.log(`SolSafe webhook server listening on port ${address.port}`);
+}
+
+function shutdown(): void {
+  server.close((error) => {
+    if (error) {
+      console.error('Failed to stop SolSafe webhook server', error);
+      process.exitCode = 1;
+    }
+  });
+}
 
 process.once('SIGINT', () => {
-  void bot.stop();
+  shutdown();
 });
 
 process.once('SIGTERM', () => {
-  void bot.stop();
+  shutdown();
 });
-
-console.log('Starting SolSafe Telegram bot...');
-
-await bot.start();
