@@ -1,36 +1,79 @@
-import { describe, expect, it } from 'vitest';
+import type { BaseMemory } from '@langchain/core/memory';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   SOLSAFE_INTENTS,
   SOLSAFE_MEMORY_KEY,
   createSolsafeAgent,
-  createSolsafeMemory,
+  type SolsafeRateLimiter,
 } from '../../src/agents/solsafe-agent.js';
 import { CHECK_TOKEN_SECURITY_SKILL_NAME } from '../../src/skills/checkTokenSecurity.js';
 import { EXPLAIN_PROGRAM_LOGS_SKILL_NAME } from '../../src/skills/explainProgramLogs.js';
 import { GET_WALLET_SUMMARY_SKILL_NAME } from '../../src/skills/getWalletSummary.js';
 import { SIMULATE_TRANSACTION_SKILL_NAME } from '../../src/skills/simulateTransaction.js';
 
+function createMemoryStub(): BaseMemory {
+  return {
+    memoryKeys: [SOLSAFE_MEMORY_KEY],
+    loadMemoryVariables: vi
+      .fn()
+      .mockResolvedValue({ [SOLSAFE_MEMORY_KEY]: [] }),
+    saveContext: vi.fn().mockResolvedValue(undefined),
+  } as unknown as BaseMemory;
+}
+
+function createRateLimiterStub(): SolsafeRateLimiter {
+  return {
+    assertWithinRateLimit: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe('solsafe agent', () => {
   it('creates an agent with initialized memory', async () => {
-    const agent = createSolsafeAgent();
-    const memoryVariables = await agent.memory.loadMemoryVariables({});
+    const memory = createMemoryStub();
+    const agent = createSolsafeAgent({
+      memory,
+      rateLimiter: createRateLimiterStub(),
+    });
+    const memoryVariables = await agent.memory.loadMemoryVariables({
+      userId: 'telegram:1234',
+    });
 
     expect(agent).toBeDefined();
-    expect(agent.memory).toBeDefined();
+    expect(agent.memory).toBe(memory);
     expect(agent.memoryKey).toBe(SOLSAFE_MEMORY_KEY);
     expect(memoryVariables).toHaveProperty(SOLSAFE_MEMORY_KEY);
   });
 
   it('allows injecting a memory instance', () => {
-    const memory = createSolsafeMemory();
-    const agent = createSolsafeAgent({ memory });
+    const memory = createMemoryStub();
+    const agent = createSolsafeAgent({
+      memory,
+      rateLimiter: createRateLimiterStub(),
+    });
 
     expect(agent.memory).toBe(memory);
   });
 
+  it('delegates per-user rate limiting to the configured limiter', async () => {
+    const rateLimiter = createRateLimiterStub();
+    const agent = createSolsafeAgent({
+      memory: createMemoryStub(),
+      rateLimiter,
+    });
+
+    await agent.assertWithinRateLimit({ userId: 'telegram:1234' });
+
+    expect(rateLimiter.assertWithinRateLimit).toHaveBeenCalledWith({
+      userId: 'telegram:1234',
+    });
+  });
+
   it('registers getWalletSummary as the first wallet lookup skill', () => {
-    const agent = createSolsafeAgent();
+    const agent = createSolsafeAgent({
+      memory: createMemoryStub(),
+      rateLimiter: createRateLimiterStub(),
+    });
 
     expect(agent.skills[0]?.name).toBe(GET_WALLET_SUMMARY_SKILL_NAME);
     expect(agent.getSkillForIntent(SOLSAFE_INTENTS.WALLET_LOOKUP)?.name).toBe(
@@ -60,7 +103,10 @@ describe('solsafe agent', () => {
     ],
     ['hello there', SOLSAFE_INTENTS.UNKNOWN],
   ])('routes "%s" to %s', (message, expectedIntent) => {
-    const agent = createSolsafeAgent();
+    const agent = createSolsafeAgent({
+      memory: createMemoryStub(),
+      rateLimiter: createRateLimiterStub(),
+    });
 
     expect(agent.routeIntent(message)).toBe(expectedIntent);
   });

@@ -1,5 +1,16 @@
 import type { BaseMemory } from '@langchain/core/memory';
-import { BufferMemory } from '@langchain/classic/memory';
+
+import {
+  createSolsafeConversationMemory,
+  type CreateSolsafeConversationMemoryOptions,
+} from '../lib/conversation-memory.js';
+import {
+  createSupabaseRateLimiter,
+  type CreateSupabaseRateLimiterOptions,
+  type RateLimitCheckInput,
+  type SolsafeRateLimiter,
+} from '../lib/rate-limit.js';
+import type { SolsafeSupabaseClient } from '../lib/supabase.js';
 
 import { createCheckTokenSecuritySkill } from '../skills/checkTokenSecurity.js';
 import { createExplainProgramLogsSkill } from '../skills/explainProgramLogs.js';
@@ -64,8 +75,10 @@ const TRANSACTION_SIMULATION_PATTERNS = [
 ];
 
 export type SolsafeAgent = {
+  assertWithinRateLimit: (input: RateLimitCheckInput) => Promise<void>;
   memory: BaseMemory;
   memoryKey: typeof SOLSAFE_MEMORY_KEY;
+  rateLimiter: SolsafeRateLimiter;
   routeIntent: (message: string) => SolsafeIntent;
   skills: SolsafeSkill[];
   getSkillForIntent: (intent: SolsafeIntent) => SolsafeSkill | undefined;
@@ -73,15 +86,26 @@ export type SolsafeAgent = {
 
 export type CreateSolsafeAgentOptions = {
   memory?: BaseMemory;
+  memoryOptions?: Omit<
+    CreateSolsafeConversationMemoryOptions,
+    'supabaseClient'
+  >;
+  rateLimiter?: SolsafeRateLimiter;
+  rateLimitOptions?: Omit<CreateSupabaseRateLimiterOptions, 'supabaseClient'>;
   skills?: SolsafeSkill[];
+  supabaseClient?: SolsafeSupabaseClient;
 };
 
-export function createSolsafeMemory(): BufferMemory {
-  return new BufferMemory({
+export type { SolsafeRateLimiter } from '../lib/rate-limit.js';
+
+export function createSolsafeMemory(
+  options: CreateSolsafeConversationMemoryOptions = {},
+): BaseMemory {
+  return createSolsafeConversationMemory({
     inputKey: SOLSAFE_INPUT_KEY,
     memoryKey: SOLSAFE_MEMORY_KEY,
     outputKey: SOLSAFE_OUTPUT_KEY,
-    returnMessages: true,
+    ...options,
   });
 }
 
@@ -114,16 +138,33 @@ export function routeSolsafeIntent(message: string): SolsafeIntent {
 export function createSolsafeAgent(
   options: CreateSolsafeAgentOptions = {},
 ): SolsafeAgent {
+  const supabaseClient = options.supabaseClient;
   const skills = options.skills ?? [
     createGetWalletSummarySkill(),
     createCheckTokenSecuritySkill(),
     createSimulateTransactionSkill(),
     createExplainProgramLogsSkill(),
   ];
+  const memory =
+    options.memory ??
+    createSolsafeMemory({
+      ...options.memoryOptions,
+      supabaseClient: supabaseClient as unknown as CreateSolsafeConversationMemoryOptions['supabaseClient'],
+    });
+  const rateLimiter =
+    options.rateLimiter ??
+    createSupabaseRateLimiter({
+      ...options.rateLimitOptions,
+      supabaseClient: supabaseClient as unknown as CreateSupabaseRateLimiterOptions['supabaseClient'],
+    });
 
   return {
-    memory: options.memory ?? createSolsafeMemory(),
+    assertWithinRateLimit(input) {
+      return rateLimiter.assertWithinRateLimit(input);
+    },
+    memory,
     memoryKey: SOLSAFE_MEMORY_KEY,
+    rateLimiter,
     routeIntent: routeSolsafeIntent,
     skills,
     getSkillForIntent(intent) {

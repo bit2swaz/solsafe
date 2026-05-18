@@ -39,20 +39,22 @@ export interface ConversationMemoryRow {
   updated_at: string;
 }
 
+export interface ConversationMemoryInsert {
+  id?: string;
+  user_id: string;
+  session_id?: string | null;
+  memory_key: string;
+  value: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface SolsafeDatabase {
   public: {
     Tables: {
       conversation_memory: {
         Row: ConversationMemoryRow;
-        Insert: {
-          id?: string;
-          user_id: string;
-          session_id?: string | null;
-          memory_key: string;
-          value: Record<string, unknown>;
-          created_at?: string;
-          updated_at?: string;
-        };
+        Insert: ConversationMemoryInsert;
         Update: Partial<ConversationMemoryRow>;
         Relationships: [];
       };
