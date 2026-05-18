@@ -1,6 +1,6 @@
 # SolSafe
 
-SolSafe is a conversational Solana security and intelligence agent built around the product shape defined in [docs/SSOT.md](docs/SSOT.md). It pairs a Telegram bot with a minimal dashboard so users can ask plain-English questions about wallets, tokens, transactions, and program logs instead of stitching together raw explorer output by hand.
+SolSafe is a conversational Solana security and intelligence agent. It pairs a Telegram bot with a minimal dashboard so users can ask plain-English questions about wallets, tokens, transactions, and program logs instead of stitching together raw explorer output by hand.
 
 The current MVP focuses on trust-building explanations, not trade automation. Every user-facing response is designed to end with an explicit DYOR reminder.
 
@@ -120,7 +120,7 @@ This starts the webhook server from [src/index.ts](src/index.ts), exposes `GET /
 
 ### Run the dashboard locally
 
-From [dashboard](/home/bit2swaz/code/solsafe/dashboard):
+From [dashboard](./dashboard):
 
 ```bash
 npm run dev
@@ -195,42 +195,6 @@ The dashboard deployment config is defined in [dashboard/vercel.json](dashboard/
 - Install command: `npm install`
 - Build command: `npm run build`
 - App root: `dashboard/`
-
-## Contribution Guide
-
-Contributions should stay aligned to [docs/SSOT.md](docs/SSOT.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
-
-1. Start from the SSOT before changing behavior, architecture, or product scope.
-2. Follow strict TDD: write or update tests first, then implement, then refactor.
-3. Keep changes narrow and consistent with the existing TypeScript and NodeNext setup.
-4. Prefer injectable adapters and small abstractions around providers like Helius, RugCheck, Groq, Supabase, and Jupiter.
-5. Use conventional commits for each mini-phase-sized change.
-
-Suggested contribution flow:
-
-```bash
-git checkout -b your-branch
-npm install --legacy-peer-deps
-npx vitest run
-npm run build
-```
-
-If your change touches the dashboard, also run:
-
-```bash
-cd dashboard
-npm install
-npm test
-npm run build
-```
-
-## Demo Video
-
-Demo placeholder: add a 2-minute walkthrough link here once the public demo is recorded.
-
-```text
-TODO: https://example.com/solsafe-demo
-```
 
 ## License
 
