@@ -1,6 +1,7 @@
 import type { BaseMemory } from '@langchain/core/memory';
 import { BufferMemory } from '@langchain/classic/memory';
 
+import { createCheckTokenSecuritySkill } from '../skills/checkTokenSecurity.js';
 import { createGetWalletSummarySkill } from '../skills/getWalletSummary.js';
 
 export const SOLSAFE_MEMORY_KEY = 'history';
@@ -98,7 +99,10 @@ export function routeSolsafeIntent(message: string): SolsafeIntent {
 export function createSolsafeAgent(
   options: CreateSolsafeAgentOptions = {},
 ): SolsafeAgent {
-  const skills = options.skills ?? [createGetWalletSummarySkill()];
+  const skills = options.skills ?? [
+    createGetWalletSummarySkill(),
+    createCheckTokenSecuritySkill(),
+  ];
 
   return {
     memory: options.memory ?? createSolsafeMemory(),

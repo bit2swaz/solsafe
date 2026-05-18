@@ -6,6 +6,7 @@ import {
   createSolsafeAgent,
   createSolsafeMemory,
 } from '../../src/agents/solsafe-agent.js';
+import { CHECK_TOKEN_SECURITY_SKILL_NAME } from '../../src/skills/checkTokenSecurity.js';
 import { GET_WALLET_SUMMARY_SKILL_NAME } from '../../src/skills/getWalletSummary.js';
 
 describe('solsafe agent', () => {
@@ -32,6 +33,9 @@ describe('solsafe agent', () => {
     expect(agent.skills[0]?.name).toBe(GET_WALLET_SUMMARY_SKILL_NAME);
     expect(agent.getSkillForIntent(SOLSAFE_INTENTS.WALLET_LOOKUP)?.name).toBe(
       GET_WALLET_SUMMARY_SKILL_NAME,
+    );
+    expect(agent.getSkillForIntent(SOLSAFE_INTENTS.TOKEN_SECURITY)?.name).toBe(
+      CHECK_TOKEN_SECURITY_SKILL_NAME,
     );
   });
 
