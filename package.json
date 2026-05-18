@@ -14,8 +14,11 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@langchain/community": "1.1.28",
+    "@langchain/core": "1.1.46",
     "dotenv": "17.4.2",
-    "grammy": "1.43.0"
+    "grammy": "1.43.0",
+    "langchain": "1.4.0"
   },
   "devDependencies": {
     "@types/node": "25.8.0",
