@@ -14,7 +14,8 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "dotenv": "17.4.2"
+    "dotenv": "17.4.2",
+    "grammy": "1.43.0"
   },
   "devDependencies": {
     "@types/node": "25.8.0",
