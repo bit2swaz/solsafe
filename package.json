@@ -16,6 +16,7 @@
   "dependencies": {
     "@langchain/community": "1.1.28",
     "@langchain/core": "1.1.46",
+    "@solana/web3.js": "1.98.4",
     "dotenv": "17.4.2",
     "grammy": "1.43.0",
     "langchain": "1.4.0",
