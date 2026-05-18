@@ -168,7 +168,7 @@ npm test
 ## Safety Model
 
 - SolSafe is a trust and interpretation layer, not a guarantee engine.
-- The public MVP only exposes the four Phase 1 skills from the SSOT.
+- The public MVP only exposes the four skills.
 - Natural-language responses append the DYOR disclaimer.
 - The system is designed to explain risk, not replace independent verification.
 
@@ -209,10 +209,6 @@ Required Vercel environment variables:
 - `SIWS_SESSION_SECRET`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-
-## Contributing
-
-Issues and pull requests are welcome. Keep changes aligned with [docs/SSOT.md](docs/SSOT.md), keep the public MVP limited to the four live skills above, and preserve the DYOR footer on all user-facing responses.
 
 ## License
 

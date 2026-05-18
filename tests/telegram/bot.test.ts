@@ -8,7 +8,7 @@ import {
 import type { QueryHistoryStore } from '../../src/lib/query-history.js';
 import {
   createBot,
-  handleConfirmCommand,
+      handleConfirmCommand,
   handleLinkCommand,
   handleStartCommand,
   handleTextMessage,
