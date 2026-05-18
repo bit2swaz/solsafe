@@ -92,8 +92,9 @@ export default async function Home() {
                   role key into the browser.
                 </p>
                 <p>
-                  The wallet health visual is a dashboard readiness indicator, not a full
-                  risk engine. It becomes richer as more post-MVP scoring skills land.
+                  The wallet health visual is now derived from the live wallet summary for
+                  the signed-in address. It is still an MVP summary view, not a full risk
+                  engine.
                 </p>
               </CardContent>
             </Card>

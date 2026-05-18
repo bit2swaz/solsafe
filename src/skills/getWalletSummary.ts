@@ -239,12 +239,30 @@ function normalizeWalletAddress(walletAddress: string): string {
 }
 
 function formatWalletSummary(snapshot: WalletSummarySnapshot): string {
+  const recentTransactionCountLine = formatRecentTransactionCountLine(
+    snapshot.recentTransactionCount,
+  );
+
   return [
     `Wallet ${snapshot.walletAddress} has been active for ${snapshot.walletAgeDays} days.`,
     formatBalanceLine(snapshot.solBalance, snapshot.tokenHoldings),
     `Last transaction: ${formatRecentTransaction(snapshot.recentTransaction)}.`,
+    ...(recentTransactionCountLine ? [recentTransactionCountLine] : []),
     SSOT_RISK_ASSESSMENT_LINE,
   ].join('\n');
+}
+
+function formatRecentTransactionCountLine(
+  recentTransactionCount: number | undefined,
+): string | null {
+  if (
+    recentTransactionCount === undefined ||
+    !Number.isFinite(recentTransactionCount)
+  ) {
+    return null;
+  }
+
+  return `Recent transactions: ${Math.max(0, Math.round(recentTransactionCount))} recent signatures observed.`;
 }
 
 function formatBalanceLine(

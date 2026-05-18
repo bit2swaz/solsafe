@@ -22,6 +22,7 @@ describe('getWalletSummary skill', () => {
         relativeTime: '2 hours ago',
         summary: 'sent 0.1 SOL to Jupiter',
       },
+      recentTransactionCount: 12,
     });
 
     const skill = createGetWalletSummarySkill({
@@ -41,6 +42,7 @@ describe('getWalletSummary skill', () => {
         `Wallet ${walletAddress} has been active for 234 days.`,
         'Current balance: 12.4 SOL, 1,200 USDC, and 50k BONK.',
         'Last transaction: 2 hours ago (sent 0.1 SOL to Jupiter).',
+        'Recent transactions: 12 recent signatures observed.',
         'Risk assessment: No interactions with known scam contracts. ✅',
       ].join('\n'),
       data: {
@@ -55,6 +57,7 @@ describe('getWalletSummary skill', () => {
           relativeTime: '2 hours ago',
           summary: 'sent 0.1 SOL to Jupiter',
         },
+        recentTransactionCount: 12,
       },
     });
   });

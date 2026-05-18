@@ -36,7 +36,7 @@ export function WalletHealthPanel({ health }: WalletHealthPanelProps) {
               <div className="grid h-full w-full place-items-center rounded-full bg-background/95 text-center shadow-inner">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                    Readiness
+                    On-chain
                   </p>
                   <p className="mt-2 text-5xl font-semibold tracking-tight text-foreground">
                     {health.score}
@@ -54,9 +54,9 @@ export function WalletHealthPanel({ health }: WalletHealthPanelProps) {
                 <span className="font-medium">Dashboard interpretation</span>
               </div>
               <p className="mt-3">
-                This visual is intentionally monochrome and compact. It surfaces how much
-                authenticated context the dashboard has on hand, rather than pretending to
-                be a full on-chain risk engine before the post-MVP skills land.
+                This visual now comes from the live wallet summary for the signed-in
+                address. It highlights wallet age, visible balances, and recent on-chain
+                activity instead of placeholder dashboard readiness data.
               </p>
             </div>
           </div>
