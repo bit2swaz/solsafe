@@ -3,6 +3,7 @@ import { BufferMemory } from '@langchain/classic/memory';
 
 import { createCheckTokenSecuritySkill } from '../skills/checkTokenSecurity.js';
 import { createGetWalletSummarySkill } from '../skills/getWalletSummary.js';
+import { createSimulateTransactionSkill } from '../skills/simulateTransaction.js';
 
 export const SOLSAFE_MEMORY_KEY = 'history';
 export const SOLSAFE_INPUT_KEY = 'input';
@@ -102,6 +103,7 @@ export function createSolsafeAgent(
   const skills = options.skills ?? [
     createGetWalletSummarySkill(),
     createCheckTokenSecuritySkill(),
+    createSimulateTransactionSkill(),
   ];
 
   return {

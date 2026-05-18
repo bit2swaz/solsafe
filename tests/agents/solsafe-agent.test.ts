@@ -8,6 +8,7 @@ import {
 } from '../../src/agents/solsafe-agent.js';
 import { CHECK_TOKEN_SECURITY_SKILL_NAME } from '../../src/skills/checkTokenSecurity.js';
 import { GET_WALLET_SUMMARY_SKILL_NAME } from '../../src/skills/getWalletSummary.js';
+import { SIMULATE_TRANSACTION_SKILL_NAME } from '../../src/skills/simulateTransaction.js';
 
 describe('solsafe agent', () => {
   it('creates an agent with initialized memory', async () => {
@@ -37,6 +38,9 @@ describe('solsafe agent', () => {
     expect(agent.getSkillForIntent(SOLSAFE_INTENTS.TOKEN_SECURITY)?.name).toBe(
       CHECK_TOKEN_SECURITY_SKILL_NAME,
     );
+    expect(
+      agent.getSkillForIntent(SOLSAFE_INTENTS.TRANSACTION_SIMULATION)?.name,
+    ).toBe(SIMULATE_TRANSACTION_SKILL_NAME);
   });
 
   it.each([
