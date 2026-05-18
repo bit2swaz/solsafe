@@ -25,7 +25,7 @@ const DEFAULT_MAX_SIGNATURE_PAGES = 10;
 const TOKEN_PROGRAM_ID = new PublicKey(
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
 );
-const KNOWN_TOKEN_SYMBOLS: Record<string, string> = {
+export const KNOWN_TOKEN_SYMBOLS: Record<string, string> = {
   DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: 'BONK',
   EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: 'USDC',
   Es9vMFrzaCERmJfrF4H2FYD6tDc5sWc5oAWnqLBaQx2R: 'USDT',
