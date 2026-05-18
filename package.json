@@ -5,11 +5,22 @@
   "description": "SolSafe project scaffold aligned to docs/SSOT.md",
   "type": "module",
   "engines": {
-    "node": "24.x"
+    "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "node --eval \"console.log('Dev entry not configured yet')\"",
-    "test": "node --eval \"console.log('No tests configured yet')\"",
-    "build": "node --eval \"console.log('Build step not configured yet')\""
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "dotenv": "17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "25.8.0",
+    "@vitest/ui": "4.1.6",
+    "tsx": "4.22.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.6"
   }
 }
