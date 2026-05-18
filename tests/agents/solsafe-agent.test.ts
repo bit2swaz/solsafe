@@ -7,6 +7,7 @@ import {
   createSolsafeMemory,
 } from '../../src/agents/solsafe-agent.js';
 import { CHECK_TOKEN_SECURITY_SKILL_NAME } from '../../src/skills/checkTokenSecurity.js';
+import { EXPLAIN_PROGRAM_LOGS_SKILL_NAME } from '../../src/skills/explainProgramLogs.js';
 import { GET_WALLET_SUMMARY_SKILL_NAME } from '../../src/skills/getWalletSummary.js';
 import { SIMULATE_TRANSACTION_SKILL_NAME } from '../../src/skills/simulateTransaction.js';
 
@@ -39,6 +40,9 @@ describe('solsafe agent', () => {
       CHECK_TOKEN_SECURITY_SKILL_NAME,
     );
     expect(
+      agent.getSkillForIntent(SOLSAFE_INTENTS.PROGRAM_LOG_EXPLANATION)?.name,
+    ).toBe(EXPLAIN_PROGRAM_LOGS_SKILL_NAME);
+    expect(
       agent.getSkillForIntent(SOLSAFE_INTENTS.TRANSACTION_SIMULATION)?.name,
     ).toBe(SIMULATE_TRANSACTION_SKILL_NAME);
   });
@@ -46,6 +50,10 @@ describe('solsafe agent', () => {
   it.each([
     ['check wallet 8vFzXabc123', SOLSAFE_INTENTS.WALLET_LOOKUP],
     ['what about the BONK token? is it safe?', SOLSAFE_INTENTS.TOKEN_SECURITY],
+    [
+      'can you explain these program logs?',
+      SOLSAFE_INTENTS.PROGRAM_LOG_EXPLANATION,
+    ],
     [
       'can you simulate this transaction before i sign it?',
       SOLSAFE_INTENTS.TRANSACTION_SIMULATION,

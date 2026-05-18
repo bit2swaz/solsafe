@@ -2,6 +2,7 @@ import type { BaseMemory } from '@langchain/core/memory';
 import { BufferMemory } from '@langchain/classic/memory';
 
 import { createCheckTokenSecuritySkill } from '../skills/checkTokenSecurity.js';
+import { createExplainProgramLogsSkill } from '../skills/explainProgramLogs.js';
 import { createGetWalletSummarySkill } from '../skills/getWalletSummary.js';
 import { createSimulateTransactionSkill } from '../skills/simulateTransaction.js';
 
@@ -11,6 +12,7 @@ export const SOLSAFE_OUTPUT_KEY = 'output';
 
 export const SOLSAFE_INTENTS = {
   UNKNOWN: 'unknown',
+  PROGRAM_LOG_EXPLANATION: 'program_log_explanation',
   TOKEN_SECURITY: 'token_security',
   TRANSACTION_SIMULATION: 'transaction_simulation',
   WALLET_LOOKUP: 'wallet_lookup',
@@ -43,6 +45,14 @@ const TOKEN_SECURITY_PATTERNS = [
   /\bliquidity\b/i,
   /\bholders?\b/i,
   /\bis it safe\b/i,
+];
+
+const PROGRAM_LOG_EXPLANATION_PATTERNS = [
+  /\bprogram logs?\b/i,
+  /\blogs?\b/i,
+  /\bcustom program error\b/i,
+  /\banchorerror\b/i,
+  /\bexplain .*logs?\b/i,
 ];
 
 const TRANSACTION_SIMULATION_PATTERNS = [
@@ -82,6 +92,10 @@ function matchesAnyPattern(message: string, patterns: RegExp[]): boolean {
 export function routeSolsafeIntent(message: string): SolsafeIntent {
   const normalizedMessage = message.trim();
 
+  if (matchesAnyPattern(normalizedMessage, PROGRAM_LOG_EXPLANATION_PATTERNS)) {
+    return SOLSAFE_INTENTS.PROGRAM_LOG_EXPLANATION;
+  }
+
   if (matchesAnyPattern(normalizedMessage, TRANSACTION_SIMULATION_PATTERNS)) {
     return SOLSAFE_INTENTS.TRANSACTION_SIMULATION;
   }
@@ -104,6 +118,7 @@ export function createSolsafeAgent(
     createGetWalletSummarySkill(),
     createCheckTokenSecuritySkill(),
     createSimulateTransactionSkill(),
+    createExplainProgramLogsSkill(),
   ];
 
   return {
