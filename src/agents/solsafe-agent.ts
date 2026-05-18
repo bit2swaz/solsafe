@@ -12,6 +12,10 @@ import {
 } from '../lib/rate-limit.js';
 import type { SolsafeSupabaseClient } from '../lib/supabase.js';
 import {
+  type AssessWalletRiskInput,
+  createAssessWalletRiskSkill,
+} from '../skills/assessWalletRisk.js';
+import {
   type CheckTokenSecurityInput,
   createCheckTokenSecuritySkill,
 } from '../skills/checkTokenSecurity.js';
@@ -20,10 +24,18 @@ import {
   createExplainProgramLogsSkill,
 } from '../skills/explainProgramLogs.js';
 import {
+  type GetWhaleAlertsInput,
+  createGetWhaleAlertsSkill,
+} from '../skills/getWhaleAlerts.js';
+import {
   KNOWN_TOKEN_SYMBOLS,
   type GetWalletSummaryInput,
   createGetWalletSummarySkill,
 } from '../skills/getWalletSummary.js';
+import {
+  type NaturalLanguageSwapInput,
+  createNaturalLanguageSwapSkill,
+} from '../skills/naturalLanguageSwap.js';
 import {
   type SimulateTransactionInput,
   createSimulateTransactionSkill,
@@ -36,11 +48,14 @@ export const SOLSAFE_DYOR_DISCLAIMER =
   'Always DYOR. This is not financial advice.';
 
 export const SOLSAFE_INTENTS = {
+  NATURAL_LANGUAGE_SWAP: 'natural_language_swap',
   UNKNOWN: 'unknown',
   PROGRAM_LOG_EXPLANATION: 'program_log_explanation',
   TOKEN_SECURITY: 'token_security',
   TRANSACTION_SIMULATION: 'transaction_simulation',
+  WALLET_RISK: 'wallet_risk',
   WALLET_LOOKUP: 'wallet_lookup',
+  WHALE_ALERTS: 'whale_alerts',
 } as const;
 
 export type SolsafeIntent =
@@ -86,6 +101,24 @@ const TRANSACTION_SIMULATION_PATTERNS = [
   /\btransaction\b/i,
   /\bbefore i sign\b/i,
   /\bsigned? tx\b/i,
+];
+
+const NATURAL_LANGUAGE_SWAP_PATTERNS = [
+  /\bswap\s+\d+(?:\.\d+)?\s+[a-z0-9]+\s+(?:for|to)\s+[a-z0-9]+\b/i,
+  /\btrade\s+\d+(?:\.\d+)?\s+[a-z0-9]+\s+(?:for|to)\s+[a-z0-9]+\b/i,
+];
+
+const WALLET_RISK_PATTERNS = [
+  /\bassess wallet risk\b/i,
+  /\bwallet risk\b/i,
+  /\brisky wallet\b/i,
+  /\brisk assessment\b/i,
+];
+
+const WHALE_ALERT_PATTERNS = [
+  /\bwhale alerts?\b/i,
+  /\bmonitor whale\b/i,
+  /\blarge movements?\b/i,
 ];
 
 const SOLANA_ADDRESS_PATTERN = /\b[A-HJ-NP-Za-km-z1-9]{32,44}\b/g;
@@ -174,6 +207,18 @@ export function routeSolsafeIntent(message: string): SolsafeIntent {
     return SOLSAFE_INTENTS.TRANSACTION_SIMULATION;
   }
 
+  if (matchesAnyPattern(normalizedMessage, NATURAL_LANGUAGE_SWAP_PATTERNS)) {
+    return SOLSAFE_INTENTS.NATURAL_LANGUAGE_SWAP;
+  }
+
+  if (matchesAnyPattern(normalizedMessage, WHALE_ALERT_PATTERNS)) {
+    return SOLSAFE_INTENTS.WHALE_ALERTS;
+  }
+
+  if (matchesAnyPattern(normalizedMessage, WALLET_RISK_PATTERNS)) {
+    return SOLSAFE_INTENTS.WALLET_RISK;
+  }
+
   if (matchesAnyPattern(normalizedMessage, TOKEN_SECURITY_PATTERNS)) {
     return SOLSAFE_INTENTS.TOKEN_SECURITY;
   }
@@ -194,6 +239,9 @@ export function createSolsafeAgent(
     createCheckTokenSecuritySkill(),
     createSimulateTransactionSkill(),
     createExplainProgramLogsSkill(),
+    createGetWhaleAlertsSkill(),
+    createAssessWalletRiskSkill(),
+    createNaturalLanguageSwapSkill(),
   ];
   const memory =
     options.memory ??
@@ -240,7 +288,7 @@ export async function executeSolsafeTurn(
 
   if (intent === SOLSAFE_INTENTS.UNKNOWN) {
     const response = appendSolsafeSafetyDisclaimer(
-      'I can help with wallet lookups, token security checks, transaction simulations, and program log explanations.',
+      'I can help with wallet lookups, token security checks, transaction simulations, program log explanations, whale alert planning, wallet risk reviews, and swap previews.',
     );
 
     await saveSolsafeTurnToMemory(input.agent.memory, {
@@ -292,9 +340,12 @@ function resolveSolsafeSkillInput(
   message: string,
   memoryValue: unknown,
 ):
+  | AssessWalletRiskInput
   | CheckTokenSecurityInput
   | ExplainProgramLogsInput
+  | GetWhaleAlertsInput
   | GetWalletSummaryInput
+  | NaturalLanguageSwapInput
   | SimulateTransactionInput {
   switch (intent) {
     case SOLSAFE_INTENTS.WALLET_LOOKUP:
@@ -309,9 +360,24 @@ function resolveSolsafeSkillInput(
       return {
         serializedTransaction: extractSerializedTransaction(message),
       };
+    case SOLSAFE_INTENTS.NATURAL_LANGUAGE_SWAP:
+      return {
+        request: message,
+        walletAddress: extractOptionalSolanaAddress(message),
+        confirmed: isSwapConfirmationMessage(message),
+      };
     case SOLSAFE_INTENTS.PROGRAM_LOG_EXPLANATION:
       return {
         logs: extractProgramLogs(message),
+      };
+    case SOLSAFE_INTENTS.WHALE_ALERTS:
+      return {
+        walletAddress: extractSolanaAddress(message, 'wallet address'),
+        minimumTransferSol: extractOptionalSolAmount(message) ?? 250,
+      };
+    case SOLSAFE_INTENTS.WALLET_RISK:
+      return {
+        walletAddress: extractSolanaAddress(message, 'wallet address'),
       };
     default:
       throw new Error(`No Solsafe input resolver exists for intent: ${intent}`);
@@ -405,6 +471,24 @@ function extractSolanaAddress(message: string, label: string): string {
   }
 
   return address;
+}
+
+function extractOptionalSolanaAddress(message: string): string | null {
+  return findFirstMatch(message, SOLANA_ADDRESS_PATTERN);
+}
+
+function extractOptionalSolAmount(message: string): number | null {
+  const amountMatch = /(\d+(?:\.\d+)?)\s*SOL\b/i.exec(message);
+
+  if (!amountMatch) {
+    return null;
+  }
+
+  return Number(amountMatch[1]);
+}
+
+function isSwapConfirmationMessage(message: string): boolean {
+  return /\b(?:confirm|confirmed|approve)\b/i.test(message);
 }
 
 function findFirstMatch(message: string, pattern: RegExp): string | null {
