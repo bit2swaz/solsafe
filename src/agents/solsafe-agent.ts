@@ -1,6 +1,8 @@
 import type { BaseMemory } from '@langchain/core/memory';
 import { BufferMemory } from '@langchain/classic/memory';
 
+import { createGetWalletSummarySkill } from '../skills/getWalletSummary.js';
+
 export const SOLSAFE_MEMORY_KEY = 'history';
 export const SOLSAFE_INPUT_KEY = 'input';
 export const SOLSAFE_OUTPUT_KEY = 'output';
@@ -14,6 +16,13 @@ export const SOLSAFE_INTENTS = {
 
 export type SolsafeIntent =
   (typeof SOLSAFE_INTENTS)[keyof typeof SOLSAFE_INTENTS];
+
+export interface SolsafeSkill<TInput = unknown, TOutput = unknown> {
+  name: string;
+  description: string;
+  intent: SolsafeIntent;
+  execute(input: TInput): Promise<TOutput>;
+}
 
 const WALLET_LOOKUP_PATTERNS = [
   /\bwallet\b/i,
@@ -46,10 +55,13 @@ export type SolsafeAgent = {
   memory: BaseMemory;
   memoryKey: typeof SOLSAFE_MEMORY_KEY;
   routeIntent: (message: string) => SolsafeIntent;
+  skills: SolsafeSkill[];
+  getSkillForIntent: (intent: SolsafeIntent) => SolsafeSkill | undefined;
 };
 
 export type CreateSolsafeAgentOptions = {
   memory?: BaseMemory;
+  skills?: SolsafeSkill[];
 };
 
 export function createSolsafeMemory(): BufferMemory {
@@ -86,9 +98,15 @@ export function routeSolsafeIntent(message: string): SolsafeIntent {
 export function createSolsafeAgent(
   options: CreateSolsafeAgentOptions = {},
 ): SolsafeAgent {
+  const skills = options.skills ?? [createGetWalletSummarySkill()];
+
   return {
     memory: options.memory ?? createSolsafeMemory(),
     memoryKey: SOLSAFE_MEMORY_KEY,
     routeIntent: routeSolsafeIntent,
+    skills,
+    getSkillForIntent(intent) {
+      return skills.find((skill) => skill.intent === intent);
+    },
   };
 }

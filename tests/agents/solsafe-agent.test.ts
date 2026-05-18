@@ -6,6 +6,7 @@ import {
   createSolsafeAgent,
   createSolsafeMemory,
 } from '../../src/agents/solsafe-agent.js';
+import { GET_WALLET_SUMMARY_SKILL_NAME } from '../../src/skills/getWalletSummary.js';
 
 describe('solsafe agent', () => {
   it('creates an agent with initialized memory', async () => {
@@ -23,6 +24,15 @@ describe('solsafe agent', () => {
     const agent = createSolsafeAgent({ memory });
 
     expect(agent.memory).toBe(memory);
+  });
+
+  it('registers getWalletSummary as the first wallet lookup skill', () => {
+    const agent = createSolsafeAgent();
+
+    expect(agent.skills[0]?.name).toBe(GET_WALLET_SUMMARY_SKILL_NAME);
+    expect(agent.getSkillForIntent(SOLSAFE_INTENTS.WALLET_LOOKUP)?.name).toBe(
+      GET_WALLET_SUMMARY_SKILL_NAME,
+    );
   });
 
   it.each([
