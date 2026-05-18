@@ -2,14 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createSupabaseQueryHistoryStore,
+  type QueryHistoryIdentityBridge,
   type QueryHistorySupabaseClient,
   type QueryHistoryRow,
 } from '../../src/lib/query-history.js';
 
 const INSERTED_ROW: QueryHistoryRow = {
   id: 'f839eef1-18c2-4e57-a0ea-c78dd0722d89',
+  linked_wallet_address: '6WJw6cr7L7Mu6J26G2p5c5Ny8JD7BqXc9E8u6KDAdAm8',
   user_id: 'telegram:1234',
   session_id: 'session-abc',
+  telegram_user_id: '1234',
   intent: 'wallet_lookup',
   query_text: 'check wallet 8vFzX...',
   response_summary: 'Wallet 8vFzX... has been active for 234 days.',
@@ -24,6 +27,7 @@ describe('query history store', () => {
   let selectMock: ReturnType<typeof vi.fn>;
   let insertMock: ReturnType<typeof vi.fn>;
   let fromMock: ReturnType<typeof vi.fn>;
+  let identityBridge: QueryHistoryIdentityBridge;
   let supabaseClient: QueryHistorySupabaseClient;
 
   beforeEach(() => {
@@ -42,9 +46,14 @@ describe('query history store', () => {
     supabaseClient = {
       from: fromMock as unknown as QueryHistorySupabaseClient['from'],
     };
+    identityBridge = {
+      getWalletByTelegramId: vi.fn().mockResolvedValue(
+        '6WJw6cr7L7Mu6J26G2p5c5Ny8JD7BqXc9E8u6KDAdAm8',
+      ),
+    };
   });
 
-  it('stores a query history entry and returns the inserted record', async () => {
+  it('stores a query history entry with Telegram and linked wallet identity', async () => {
     const insertedSelectMock = vi.fn().mockResolvedValue({
       data: [INSERTED_ROW],
       error: null,
@@ -53,11 +62,13 @@ describe('query history store', () => {
       select: insertedSelectMock,
     });
     const store = createSupabaseQueryHistoryStore({
+      identityBridge,
       supabaseClient,
     });
 
     await expect(
       store.saveQueryHistoryEntry({
+        telegramUserId: '1234',
         userId: 'telegram:1234',
         sessionId: 'session-abc',
         intent: 'wallet_lookup',
@@ -72,6 +83,7 @@ describe('query history store', () => {
 
     expect(fromMock).toHaveBeenCalledWith('query_history');
     expect(insertMock).toHaveBeenCalledWith({
+      linked_wallet_address: '6WJw6cr7L7Mu6J26G2p5c5Ny8JD7BqXc9E8u6KDAdAm8',
       user_id: 'telegram:1234',
       session_id: 'session-abc',
       intent: 'wallet_lookup',
@@ -82,10 +94,11 @@ describe('query history store', () => {
         skillName: 'getWalletSummary',
       },
     });
+    expect(identityBridge.getWalletByTelegramId).toHaveBeenCalledWith('1234');
     expect(insertedSelectMock).toHaveBeenCalledWith('*');
   });
 
-  it('retrieves recent query history for a user in newest-first order', async () => {
+  it('retrieves query history for a linked wallet address in newest-first order', async () => {
     const limitMock = vi.fn().mockResolvedValue({
       data: [
         INSERTED_ROW,
@@ -108,8 +121,8 @@ describe('query history store', () => {
     });
 
     await expect(
-      store.listRecentQueryHistory({
-        userId: 'telegram:1234',
+      store.getQueryHistory({
+        linkedWalletAddress: '6WJw6cr7L7Mu6J26G2p5c5Ny8JD7BqXc9E8u6KDAdAm8',
         limit: 2,
       }),
     ).resolves.toEqual([
@@ -125,7 +138,10 @@ describe('query history store', () => {
     ]);
 
     expect(selectMock).toHaveBeenCalledWith('*');
-    expect(eqMock).toHaveBeenCalledWith('user_id', 'telegram:1234');
+    expect(eqMock).toHaveBeenCalledWith(
+      'linked_wallet_address',
+      '6WJw6cr7L7Mu6J26G2p5c5Ny8JD7BqXc9E8u6KDAdAm8',
+    );
     expect(orderMock).toHaveBeenCalledWith('created_at', { ascending: false });
     expect(limitMock).toHaveBeenCalledWith(2);
   });
@@ -141,6 +157,7 @@ describe('query history store', () => {
       select: insertedSelectMock,
     });
     const store = createSupabaseQueryHistoryStore({
+      identityBridge,
       supabaseClient,
     });
 

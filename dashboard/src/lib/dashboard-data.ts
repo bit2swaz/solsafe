@@ -31,6 +31,83 @@ export interface DashboardSnapshot {
   historyState: 'empty' | 'live' | 'preview';
 }
 
+export interface DashboardDataDependencies {
+  identityBridge?: Pick<DashboardIdentityBridge, 'listTelegramIdsByWallet'>;
+  queryHistoryStore?: Pick<DashboardQueryHistoryStore, 'getQueryHistory'>;
+}
+
+interface DashboardSupabaseErrorLike {
+  message: string;
+}
+
+interface DashboardIdentityBridge {
+  listTelegramIdsByWallet(walletAddress: string): Promise<string[]>;
+}
+
+interface DashboardIdentityLinkLookupRow {
+  telegram_user_id: string | null;
+}
+
+interface DashboardIdentityLinkLimitBuilder {
+  limit(limit: number): Promise<{
+    data: DashboardIdentityLinkLookupRow[] | null;
+    error: DashboardSupabaseErrorLike | null;
+  }>;
+}
+
+interface DashboardIdentityLinkSelectBuilder {
+  eq(column: string, value: string): DashboardIdentityLinkLimitBuilder;
+}
+
+interface DashboardQueryHistoryRow {
+  created_at: string;
+  id: string;
+  intent: string;
+  linked_wallet_address: string | null;
+  metadata: Record<string, unknown>;
+  query_text: string;
+  response_summary: string;
+  session_id: string | null;
+  telegram_user_id: string | null;
+  user_id: string;
+}
+
+interface DashboardQueryHistoryStore {
+  getQueryHistory(input: {
+    limit?: number;
+    linkedWalletAddress?: string;
+    telegramUserId?: string;
+    userId?: string;
+  }): Promise<DashboardQueryHistoryRow[]>;
+}
+
+interface DashboardQueryHistoryLimitBuilder {
+  limit(limit: number): Promise<{
+    data: DashboardQueryHistoryRow[] | null;
+    error: DashboardSupabaseErrorLike | null;
+  }>;
+}
+
+interface DashboardQueryHistoryOrderBuilder {
+  order(
+    column: string,
+    options: { ascending: boolean },
+  ): DashboardQueryHistoryLimitBuilder;
+}
+
+interface DashboardQueryHistorySelectBuilder {
+  eq(column: string, value: string): DashboardQueryHistoryOrderBuilder;
+}
+
+interface DashboardSupabaseClient {
+  from(table: 'identity_links'): {
+    select(columns: string): DashboardIdentityLinkSelectBuilder;
+  };
+  from(table: 'query_history'): {
+    select(columns: string): DashboardQueryHistorySelectBuilder;
+  };
+}
+
 const PREVIEW_QUERY_HISTORY: DashboardQueryHistoryItem[] = [
   {
     createdAt: '2026-05-18T18:08:00.000Z',
@@ -63,6 +140,7 @@ const PREVIEW_QUERY_HISTORY: DashboardQueryHistoryItem[] = [
 
 export async function getDashboardSnapshot(
   address?: string | null,
+  dependencies: DashboardDataDependencies = {},
 ): Promise<DashboardSnapshot> {
   const normalizedAddress = normalizeOptionalValue(address);
 
@@ -74,7 +152,7 @@ export async function getDashboardSnapshot(
     };
   }
 
-  const history = await listDashboardQueryHistory(normalizedAddress);
+  const history = await listDashboardQueryHistory(normalizedAddress, dependencies);
 
   return {
     health: createWalletHealthSnapshot(normalizedAddress, history),
@@ -85,11 +163,66 @@ export async function getDashboardSnapshot(
 
 async function listDashboardQueryHistory(
   address: string,
+  dependencies: DashboardDataDependencies,
 ): Promise<DashboardQueryHistoryItem[]> {
+  const dataServices = createDashboardDataServices(dependencies);
+
+  if (!dataServices) {
+    return [];
+  }
+
+  const linkedTelegramIds = await dataServices.identityBridge.listTelegramIdsByWallet(
+    address,
+  );
+  const resultSets = await Promise.all([
+    dataServices.queryHistoryStore.getQueryHistory({
+      limit: 6,
+      linkedWalletAddress: address,
+    }),
+    ...linkedTelegramIds.map((telegramUserId) =>
+      dataServices.queryHistoryStore.getQueryHistory({
+        limit: 6,
+        telegramUserId,
+      }),
+    ),
+    dataServices.queryHistoryStore.getQueryHistory({
+      limit: 6,
+      userId: address,
+    }),
+    dataServices.queryHistoryStore.getQueryHistory({
+      limit: 6,
+      userId: `wallet:${address}`,
+    }),
+  ]);
+  const historyRows = dedupeAndSortHistoryRows(resultSets.flat()).slice(0, 6);
+
+  return historyRows.map((row) => ({
+    createdAt: String(row.created_at),
+    id: String(row.id),
+    intent: String(row.intent),
+    queryText: String(row.query_text),
+    responseSummary: String(row.response_summary),
+    source: extractMetadataSource(row.metadata),
+  }));
+}
+
+function createDashboardDataServices(
+  dependencies: DashboardDataDependencies,
+): {
+  identityBridge: Pick<DashboardIdentityBridge, 'listTelegramIdsByWallet'>;
+  queryHistoryStore: Pick<DashboardQueryHistoryStore, 'getQueryHistory'>;
+} | null {
+  if (dependencies.identityBridge && dependencies.queryHistoryStore) {
+    return {
+      identityBridge: dependencies.identityBridge,
+      queryHistoryStore: dependencies.queryHistoryStore,
+    };
+  }
+
   const credentials = getDashboardSupabaseCredentials();
 
   if (!credentials) {
-    return [];
+    return null;
   }
 
   const supabase = createClient(credentials.url, credentials.key, {
@@ -100,28 +233,92 @@ async function listDashboardQueryHistory(
     db: {
       schema: 'public',
     },
-  });
-  const { data, error } = await supabase
-    .from('query_history')
-    .select('id, intent, query_text, response_summary, created_at, metadata, user_id')
-    .in('user_id', [address, `wallet:${address}`])
-    .order('created_at', { ascending: false })
-    .limit(6);
+  }) as unknown as DashboardSupabaseClient;
 
-  if (error) {
-    throw new Error(
-      `Failed to load dashboard query history from Supabase: ${error.message}`,
-    );
+  return {
+    identityBridge: dependencies.identityBridge ?? createDashboardIdentityBridge(supabase),
+    queryHistoryStore:
+      dependencies.queryHistoryStore ?? createDashboardQueryHistoryStore(supabase),
+  };
+}
+
+function createDashboardIdentityBridge(
+  supabase: DashboardSupabaseClient,
+): DashboardIdentityBridge {
+  return {
+    async listTelegramIdsByWallet(walletAddress) {
+      const { data, error } = await supabase
+        .from('identity_links')
+        .select('telegram_user_id')
+        .eq('wallet_address', walletAddress)
+        .limit(25);
+
+      if (error) {
+        throw new Error(
+          `Failed to load dashboard identity links from Supabase: ${error.message}`,
+        );
+      }
+
+      return (data ?? [])
+        .map((row) => row.telegram_user_id)
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+    },
+  };
+}
+
+function createDashboardQueryHistoryStore(
+  supabase: DashboardSupabaseClient,
+): DashboardQueryHistoryStore {
+  return {
+    async getQueryHistory(input) {
+      const limit = input.limit ?? 6;
+      const baseQuery = supabase.from('query_history').select(
+        'id, intent, query_text, response_summary, created_at, metadata, user_id, telegram_user_id, linked_wallet_address, session_id',
+      );
+      let filteredQuery: DashboardQueryHistoryOrderBuilder;
+
+      if (input.linkedWalletAddress) {
+        filteredQuery = baseQuery.eq(
+          'linked_wallet_address',
+          input.linkedWalletAddress,
+        );
+      } else if (input.telegramUserId) {
+        filteredQuery = baseQuery.eq('telegram_user_id', input.telegramUserId);
+      } else if (input.userId) {
+        filteredQuery = baseQuery.eq('user_id', input.userId);
+      } else {
+        throw new Error(
+          'A userId, telegramUserId, or linkedWalletAddress filter is required to query dashboard history.',
+        );
+      }
+
+      const { data, error } = await filteredQuery
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        throw new Error(
+          `Failed to load dashboard query history from Supabase: ${error.message}`,
+        );
+      }
+
+      return (data ?? []) as DashboardQueryHistoryRow[];
+    },
+  };
+}
+
+function dedupeAndSortHistoryRows(
+  rows: DashboardQueryHistoryRow[],
+): DashboardQueryHistoryRow[] {
+  const uniqueRows = new Map<string, DashboardQueryHistoryRow>();
+
+  for (const row of rows) {
+    uniqueRows.set(row.id, row);
   }
 
-  return (data ?? []).map((row) => ({
-    createdAt: String(row.created_at),
-    id: String(row.id),
-    intent: String(row.intent),
-    queryText: String(row.query_text),
-    responseSummary: String(row.response_summary),
-    source: extractMetadataSource(row.metadata),
-  }));
+  return [...uniqueRows.values()].sort(
+    (left, right) => Date.parse(right.created_at) - Date.parse(left.created_at),
+  );
 }
 
 function createPreviewWalletHealth(): WalletHealthSnapshot {

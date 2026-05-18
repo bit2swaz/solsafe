@@ -45,11 +45,20 @@ export interface QueryHistorySupabaseClient {
 
 export interface SaveQueryHistoryEntryInput {
   intent: string;
+  linkedWalletAddress?: string | null;
   metadata?: Record<string, unknown>;
   queryText: string;
   responseSummary: string;
   sessionId?: string | null;
+  telegramUserId?: string | null;
   userId: string;
+}
+
+export interface GetQueryHistoryInput {
+  limit?: number;
+  linkedWalletAddress?: string | null;
+  telegramUserId?: string | null;
+  userId?: string | null;
 }
 
 export interface ListRecentQueryHistoryInput {
@@ -57,7 +66,12 @@ export interface ListRecentQueryHistoryInput {
   userId: string;
 }
 
+export interface QueryHistoryIdentityBridge {
+  getWalletByTelegramId(telegramUserId: string): Promise<string | null>;
+}
+
 export interface QueryHistoryStore {
+  getQueryHistory(input: GetQueryHistoryInput): Promise<QueryHistoryRow[]>;
   listRecentQueryHistory(
     input: ListRecentQueryHistoryInput,
   ): Promise<QueryHistoryRow[]>;
@@ -67,6 +81,7 @@ export interface QueryHistoryStore {
 }
 
 export interface CreateSupabaseQueryHistoryStoreOptions {
+  identityBridge?: QueryHistoryIdentityBridge;
   supabaseClient?: QueryHistorySupabaseClient;
 }
 
@@ -77,14 +92,25 @@ const DEFAULT_QUERY_HISTORY_LIMIT = 20;
 export function createSupabaseQueryHistoryStore(
   options: CreateSupabaseQueryHistoryStoreOptions = {},
 ): QueryHistoryStore {
+  const identityBridge = options.identityBridge;
   const supabaseClient =
     options.supabaseClient ??
     (createSolsafeSupabaseClient() as unknown as QueryHistorySupabaseClient);
 
   return {
     async saveQueryHistoryEntry(input) {
+      const userId = normalizeRequiredValue(input.userId, 'userId');
+      const telegramUserId =
+        normalizeOptionalValue(input.telegramUserId) ??
+        extractTelegramUserIdFromUserId(userId);
+      const linkedWalletAddress =
+        normalizeOptionalValue(input.linkedWalletAddress) ??
+        (telegramUserId && identityBridge
+          ? await identityBridge.getWalletByTelegramId(telegramUserId)
+          : null);
       const queryHistoryInsert: QueryHistoryInsert = {
-        user_id: normalizeRequiredValue(input.userId, 'userId'),
+        linked_wallet_address: normalizeOptionalValue(linkedWalletAddress),
+        user_id: userId,
         session_id: normalizeOptionalValue(input.sessionId),
         intent: normalizeRequiredValue(input.intent, 'intent'),
         query_text: normalizeRequiredValue(input.queryText, 'queryText'),
@@ -114,14 +140,14 @@ export function createSupabaseQueryHistoryStore(
 
       return insertedRow;
     },
-    async listRecentQueryHistory(input) {
-      const userId = normalizeRequiredValue(input.userId, 'userId');
+    async getQueryHistory(input) {
+      const filter = resolveQueryHistoryFilter(input);
       const limit = input.limit ?? DEFAULT_QUERY_HISTORY_LIMIT;
 
       const { data, error } = await supabaseClient
         .from('query_history')
         .select('*')
-        .eq('user_id', userId)
+        .eq(filter.column, filter.value)
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -133,7 +159,49 @@ export function createSupabaseQueryHistoryStore(
 
       return data ?? [];
     },
+    async listRecentQueryHistory(input) {
+      return this.getQueryHistory({
+        limit: input.limit,
+        userId: input.userId,
+      });
+    },
   };
+}
+
+function resolveQueryHistoryFilter(input: GetQueryHistoryInput): {
+  column: 'linked_wallet_address' | 'telegram_user_id' | 'user_id';
+  value: string;
+} {
+  const linkedWalletAddress = normalizeOptionalValue(input.linkedWalletAddress);
+
+  if (linkedWalletAddress) {
+    return {
+      column: 'linked_wallet_address',
+      value: linkedWalletAddress,
+    };
+  }
+
+  const telegramUserId = normalizeOptionalValue(input.telegramUserId);
+
+  if (telegramUserId) {
+    return {
+      column: 'telegram_user_id',
+      value: telegramUserId,
+    };
+  }
+
+  const userId = normalizeOptionalValue(input.userId);
+
+  if (userId) {
+    return {
+      column: 'user_id',
+      value: userId,
+    };
+  }
+
+  throw new Error(
+    'A userId, telegramUserId, or linkedWalletAddress filter is required to query history.',
+  );
 }
 
 function normalizeRequiredValue(value: string, fieldName: string): string {
@@ -154,4 +222,8 @@ function normalizeOptionalValue(value: string | null | undefined): string | null
   const normalizedValue = value.trim();
 
   return normalizedValue || null;
+}
+
+function extractTelegramUserIdFromUserId(userId: string): string | null {
+  return userId.startsWith('telegram:') ? userId.slice('telegram:'.length) : null;
 }

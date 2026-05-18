@@ -7,9 +7,10 @@ import {
   createSiwsSessionToken,
   verifySiwsMessage,
   verifySiwsSessionToken,
-  type DashboardSession,
   type SiwsChallenge,
 } from './siws';
+
+import type { DashboardSession } from './siws';
 
 export const DASHBOARD_SESSION_COOKIE_NAME = 'solsafe_dashboard_session';
 export const SIWS_NONCE_COOKIE_NAME = 'solsafe_dashboard_siws_nonce';

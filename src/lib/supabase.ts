@@ -2,8 +2,10 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export interface QueryHistoryRow {
   id: string;
+  linked_wallet_address: string | null;
   user_id: string;
   session_id: string | null;
+  telegram_user_id: string | null;
   intent: string;
   query_text: string;
   response_summary: string;
@@ -12,12 +14,27 @@ export interface QueryHistoryRow {
 }
 
 export interface QueryHistoryInsert {
+  linked_wallet_address?: string | null;
   user_id: string;
   session_id?: string | null;
   intent: string;
   query_text: string;
   response_summary: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface IdentityLinkRow {
+  linked_at: string;
+  telegram_user_id: string;
+  updated_at: string;
+  wallet_address: string;
+}
+
+export interface IdentityLinkInsert {
+  linked_at?: string;
+  telegram_user_id: string;
+  updated_at?: string;
+  wallet_address: string;
 }
 
 export interface SkillCacheRow {
@@ -56,6 +73,12 @@ export interface SolsafeDatabase {
         Row: ConversationMemoryRow;
         Insert: ConversationMemoryInsert;
         Update: Partial<ConversationMemoryRow>;
+        Relationships: [];
+      };
+      identity_links: {
+        Row: IdentityLinkRow;
+        Insert: IdentityLinkInsert;
+        Update: Partial<IdentityLinkRow>;
         Relationships: [];
       };
       query_history: {
