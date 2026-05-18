@@ -13,7 +13,6 @@ import {
 import type { SolsafeSupabaseClient } from '../lib/supabase.js';
 import {
   type AssessWalletRiskInput,
-  createAssessWalletRiskSkill,
 } from '../skills/assessWalletRisk.js';
 import {
   type CheckTokenSecurityInput,
@@ -25,7 +24,6 @@ import {
 } from '../skills/explainProgramLogs.js';
 import {
   type GetWhaleAlertsInput,
-  createGetWhaleAlertsSkill,
 } from '../skills/getWhaleAlerts.js';
 import {
   KNOWN_TOKEN_SYMBOLS,
@@ -34,7 +32,6 @@ import {
 } from '../skills/getWalletSummary.js';
 import {
   type NaturalLanguageSwapInput,
-  createNaturalLanguageSwapSkill,
 } from '../skills/naturalLanguageSwap.js';
 import {
   type SimulateTransactionInput,
@@ -60,6 +57,13 @@ export const SOLSAFE_INTENTS = {
 
 export type SolsafeIntent =
   (typeof SOLSAFE_INTENTS)[keyof typeof SOLSAFE_INTENTS];
+
+const ACTIVE_SOLSAFE_INTENTS = [
+  SOLSAFE_INTENTS.WALLET_LOOKUP,
+  SOLSAFE_INTENTS.TOKEN_SECURITY,
+  SOLSAFE_INTENTS.TRANSACTION_SIMULATION,
+  SOLSAFE_INTENTS.PROGRAM_LOG_EXPLANATION,
+] as const satisfies readonly SolsafeIntent[];
 
 export interface SolsafeSkill<TInput = unknown, TOutput = unknown> {
   name: string;
@@ -196,34 +200,56 @@ export function appendSolsafeSafetyDisclaimer(summary: string): string {
   return `${normalizedSummary}\n${SOLSAFE_DYOR_DISCLAIMER}`;
 }
 
-export function routeSolsafeIntent(message: string): SolsafeIntent {
+export function routeSolsafeIntent(
+  message: string,
+  enabledIntents: Iterable<SolsafeIntent> = ACTIVE_SOLSAFE_INTENTS,
+): SolsafeIntent {
   const normalizedMessage = message.trim();
+  const intentSet = new Set(enabledIntents);
 
-  if (matchesAnyPattern(normalizedMessage, PROGRAM_LOG_EXPLANATION_PATTERNS)) {
+  if (
+    intentSet.has(SOLSAFE_INTENTS.PROGRAM_LOG_EXPLANATION) &&
+    matchesAnyPattern(normalizedMessage, PROGRAM_LOG_EXPLANATION_PATTERNS)
+  ) {
     return SOLSAFE_INTENTS.PROGRAM_LOG_EXPLANATION;
   }
 
-  if (matchesAnyPattern(normalizedMessage, TRANSACTION_SIMULATION_PATTERNS)) {
+  if (
+    intentSet.has(SOLSAFE_INTENTS.TRANSACTION_SIMULATION) &&
+    matchesAnyPattern(normalizedMessage, TRANSACTION_SIMULATION_PATTERNS)
+  ) {
     return SOLSAFE_INTENTS.TRANSACTION_SIMULATION;
   }
 
   if (matchesAnyPattern(normalizedMessage, NATURAL_LANGUAGE_SWAP_PATTERNS)) {
-    return SOLSAFE_INTENTS.NATURAL_LANGUAGE_SWAP;
+    return intentSet.has(SOLSAFE_INTENTS.NATURAL_LANGUAGE_SWAP)
+      ? SOLSAFE_INTENTS.NATURAL_LANGUAGE_SWAP
+      : SOLSAFE_INTENTS.UNKNOWN;
   }
 
   if (matchesAnyPattern(normalizedMessage, WHALE_ALERT_PATTERNS)) {
-    return SOLSAFE_INTENTS.WHALE_ALERTS;
+    return intentSet.has(SOLSAFE_INTENTS.WHALE_ALERTS)
+      ? SOLSAFE_INTENTS.WHALE_ALERTS
+      : SOLSAFE_INTENTS.UNKNOWN;
   }
 
   if (matchesAnyPattern(normalizedMessage, WALLET_RISK_PATTERNS)) {
-    return SOLSAFE_INTENTS.WALLET_RISK;
+    return intentSet.has(SOLSAFE_INTENTS.WALLET_RISK)
+      ? SOLSAFE_INTENTS.WALLET_RISK
+      : SOLSAFE_INTENTS.UNKNOWN;
   }
 
-  if (matchesAnyPattern(normalizedMessage, TOKEN_SECURITY_PATTERNS)) {
+  if (
+    intentSet.has(SOLSAFE_INTENTS.TOKEN_SECURITY) &&
+    matchesAnyPattern(normalizedMessage, TOKEN_SECURITY_PATTERNS)
+  ) {
     return SOLSAFE_INTENTS.TOKEN_SECURITY;
   }
 
-  if (matchesAnyPattern(normalizedMessage, WALLET_LOOKUP_PATTERNS)) {
+  if (
+    intentSet.has(SOLSAFE_INTENTS.WALLET_LOOKUP) &&
+    matchesAnyPattern(normalizedMessage, WALLET_LOOKUP_PATTERNS)
+  ) {
     return SOLSAFE_INTENTS.WALLET_LOOKUP;
   }
 
@@ -239,10 +265,8 @@ export function createSolsafeAgent(
     createCheckTokenSecuritySkill(),
     createSimulateTransactionSkill(),
     createExplainProgramLogsSkill(),
-    createGetWhaleAlertsSkill(),
-    createAssessWalletRiskSkill(),
-    createNaturalLanguageSwapSkill(),
   ];
+  const enabledIntents = skills.map((skill) => skill.intent);
   const memory =
     options.memory ??
     createSolsafeMemory({
@@ -263,7 +287,9 @@ export function createSolsafeAgent(
     memory,
     memoryKey: SOLSAFE_MEMORY_KEY,
     rateLimiter,
-    routeIntent: routeSolsafeIntent,
+    routeIntent(message) {
+      return routeSolsafeIntent(message, enabledIntents);
+    },
     skills,
     getSkillForIntent(intent) {
       return skills.find((skill) => skill.intent === intent);
@@ -288,7 +314,7 @@ export async function executeSolsafeTurn(
 
   if (intent === SOLSAFE_INTENTS.UNKNOWN) {
     const response = appendSolsafeSafetyDisclaimer(
-      'I can help with wallet lookups, token security checks, transaction simulations, program log explanations, whale alert planning, wallet risk reviews, and swap previews.',
+      'I can help with wallet lookups, token security checks, transaction simulations, and program log explanations.',
     );
 
     await saveSolsafeTurnToMemory(input.agent.memory, {

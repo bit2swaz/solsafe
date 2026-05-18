@@ -5,6 +5,7 @@ import {
   SOLSAFE_INTENTS,
   SOLSAFE_MEMORY_KEY,
   createSolsafeAgent,
+  executeSolsafeTurn,
   type SolsafeRateLimiter,
 } from '../../src/agents/solsafe-agent.js';
 import {
@@ -81,12 +82,18 @@ describe('solsafe agent', () => {
     });
   });
 
-  it('registers getWalletSummary as the first wallet lookup skill', () => {
+  it('registers only the four phase 1 MVP skills by default', () => {
     const agent = createSolsafeAgent({
       memory: createMemoryStub(),
       rateLimiter: createRateLimiterStub(),
     });
 
+    expect(agent.skills.map((skill) => skill.name)).toEqual([
+      GET_WALLET_SUMMARY_SKILL_NAME,
+      CHECK_TOKEN_SECURITY_SKILL_NAME,
+      SIMULATE_TRANSACTION_SKILL_NAME,
+      EXPLAIN_PROGRAM_LOGS_SKILL_NAME,
+    ]);
     expect(agent.skills[0]?.name).toBe(GET_WALLET_SUMMARY_SKILL_NAME);
     expect(agent.getSkillForIntent(SOLSAFE_INTENTS.WALLET_LOOKUP)?.name).toBe(
       GET_WALLET_SUMMARY_SKILL_NAME,
@@ -100,15 +107,9 @@ describe('solsafe agent', () => {
     expect(
       agent.getSkillForIntent(SOLSAFE_INTENTS.TRANSACTION_SIMULATION)?.name,
     ).toBe(SIMULATE_TRANSACTION_SKILL_NAME);
-    expect(agent.getSkillForIntent(SOLSAFE_INTENTS.WHALE_ALERTS)?.name).toBe(
-      GET_WHALE_ALERTS_SKILL_NAME,
-    );
-    expect(agent.getSkillForIntent(SOLSAFE_INTENTS.WALLET_RISK)?.name).toBe(
-      ASSESS_WALLET_RISK_SKILL_NAME,
-    );
-    expect(
-      agent.getSkillForIntent(SOLSAFE_INTENTS.NATURAL_LANGUAGE_SWAP)?.name,
-    ).toBe(NATURAL_LANGUAGE_SWAP_SKILL_NAME);
+    expect(agent.getSkillForIntent(SOLSAFE_INTENTS.WHALE_ALERTS)).toBeUndefined();
+    expect(agent.getSkillForIntent(SOLSAFE_INTENTS.WALLET_RISK)).toBeUndefined();
+    expect(agent.getSkillForIntent(SOLSAFE_INTENTS.NATURAL_LANGUAGE_SWAP)).toBeUndefined();
   });
 
   it('allows post-mvp Solana skill stubs to be injected explicitly', () => {
@@ -141,13 +142,13 @@ describe('solsafe agent', () => {
     ],
     [
       'monitor whale alerts for GDEkQF7UMr7RLv1KQKMtm8E2w3iafxJLtyXu3HVQZnME',
-      SOLSAFE_INTENTS.WHALE_ALERTS,
+      SOLSAFE_INTENTS.UNKNOWN,
     ],
     [
       'assess wallet risk for GDEkQF7UMr7RLv1KQKMtm8E2w3iafxJLtyXu3HVQZnME',
-      SOLSAFE_INTENTS.WALLET_RISK,
+      SOLSAFE_INTENTS.UNKNOWN,
     ],
-    ['swap 0.1 SOL for USDC', SOLSAFE_INTENTS.NATURAL_LANGUAGE_SWAP],
+    ['swap 0.1 SOL for USDC', SOLSAFE_INTENTS.UNKNOWN],
     ['hello there', SOLSAFE_INTENTS.UNKNOWN],
   ])('routes "%s" to %s', (message, expectedIntent) => {
     const agent = createSolsafeAgent({
@@ -156,5 +157,28 @@ describe('solsafe agent', () => {
     });
 
     expect(agent.routeIntent(message)).toBe(expectedIntent);
+  });
+
+  it('hides post-MVP stub skills from the fallback user response', async () => {
+    const memory = createMemoryStub();
+    const agent = createSolsafeAgent({
+      memory,
+      rateLimiter: createRateLimiterStub(),
+    });
+
+    const turn = await executeSolsafeTurn({
+      agent,
+      message: 'swap 0.1 SOL for USDC',
+      userId: 'telegram:1234',
+    });
+
+    expect(turn.intent).toBe(SOLSAFE_INTENTS.UNKNOWN);
+    expect(turn.response).toContain('wallet lookups');
+    expect(turn.response).toContain('token security checks');
+    expect(turn.response).toContain('transaction simulations');
+    expect(turn.response).toContain('program log explanations');
+    expect(turn.response).not.toContain('whale alert');
+    expect(turn.response).not.toContain('wallet risk');
+    expect(turn.response).not.toContain('swap preview');
   });
 });
