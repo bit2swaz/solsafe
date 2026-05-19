@@ -125,6 +125,17 @@ describe('telegram webhook server', () => {
   it('registers the webhook URL when the server starts', async () => {
     const bot = new Bot('test-token');
     const webhookUrl = 'https://example.com/telegram/webhook';
+    vi.spyOn(bot.api, 'getMe').mockResolvedValue({
+      can_connect_to_business: false,
+      can_join_groups: true,
+      can_read_all_group_messages: false,
+      first_name: 'SolSafe',
+      has_main_web_app: false,
+      id: 1,
+      is_bot: true,
+      supports_inline_queries: false,
+      username: 'solsafe_test_bot',
+    } as never);
     const setWebhook = vi
       .spyOn(bot.api, 'setWebhook')
       .mockResolvedValue(true as never);
@@ -145,6 +156,74 @@ describe('telegram webhook server', () => {
     expect(setWebhook).toHaveBeenCalledWith(webhookUrl, {
       secret_token: WEBHOOK_SECRET,
     });
+  });
+
+  it('initializes the bot before processing queued updates so /start replies successfully', async () => {
+    const webhookUrl = 'https://example.com/telegram/webhook';
+    const bot = new Bot('test-token');
+    const handledStart = Promise.withResolvers<void>();
+    const init = vi.spyOn(bot, 'init').mockImplementation(async () => {
+      bot.botInfo = {
+        can_connect_to_business: false,
+        can_join_groups: true,
+        can_read_all_group_messages: false,
+        first_name: 'SolSafe',
+        has_main_web_app: false,
+        id: 1,
+        is_bot: true,
+        supports_inline_queries: false,
+        username: 'solsafe_test_bot',
+      } as never;
+    });
+
+    bot.command('start', () => {
+      handledStart.resolve();
+    });
+
+    const server = createTelegramServer({
+      bot,
+      webhookSecret: WEBHOOK_SECRET,
+      webhookUrl,
+    });
+
+    const baseUrl = await listen(server);
+    const response = await fetch(`${baseUrl}${getWebhookPath(webhookUrl)}`, {
+      body: JSON.stringify({
+        update_id: 7,
+        message: {
+          chat: {
+            id: 123,
+            type: 'private',
+          },
+          date: 1,
+          entities: [
+            {
+              length: 6,
+              offset: 0,
+              type: 'bot_command',
+            },
+          ],
+          from: {
+            first_name: 'Test',
+            id: 42,
+            is_bot: false,
+          },
+          message_id: 1,
+          text: '/start',
+        },
+      }),
+      headers: {
+        'content-type': 'application/json',
+        'x-telegram-bot-api-secret-token': WEBHOOK_SECRET,
+      },
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(200);
+
+    await handledStart.promise;
+
+    expect(init).toHaveBeenCalledTimes(1);
   });
 
   it('acknowledges webhook updates immediately and ignores duplicate update ids while processing', async () => {

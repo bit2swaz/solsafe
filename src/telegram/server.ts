@@ -7,6 +7,7 @@ import { createBot } from './bot.js';
 
 const TELEGRAM_WEBHOOK_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
 const TELEGRAM_UPDATE_TTL_MS = 15 * 60_000;
+const botInitializationTasks = new WeakMap<Bot, Promise<void>>();
 
 type WebhookHandler = (
   req: IncomingMessage,
@@ -302,6 +303,7 @@ function createQueuedWebhookHandler(
     const update = await readTelegramUpdate(req);
     const accepted = updateQueue.enqueue(update, async () => {
       try {
+        await ensureBotInitialized(bot);
         await bot.handleUpdate(update as never);
       } catch (error) {
         console.error('Failed to process Telegram update', error);
@@ -361,4 +363,38 @@ function getTelegramUpdateQueueKey(update: TelegramUpdate): string {
   }
 
   return 'global';
+}
+
+async function ensureBotInitialized(bot: Bot): Promise<void> {
+  const maybeBot = bot as Bot & {
+    init?: () => Promise<void>;
+    isInited?: () => boolean;
+  };
+
+  if (
+    typeof maybeBot.init !== 'function' ||
+    typeof maybeBot.isInited !== 'function'
+  ) {
+    return;
+  }
+
+  if (maybeBot.isInited()) {
+    return;
+  }
+
+  const existingTask = botInitializationTasks.get(bot);
+
+  if (existingTask) {
+    await existingTask;
+    return;
+  }
+
+  const initializationTask = bot
+    .init()
+    .finally(() => {
+      botInitializationTasks.delete(bot);
+    });
+
+  botInitializationTasks.set(bot, initializationTask);
+  await initializationTask;
 }
