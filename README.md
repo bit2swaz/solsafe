@@ -30,9 +30,17 @@ Representative SSOT-style flow:
 
 ```text
 User: @SolBot check wallet 8vFzX...
-Bot:  Wallet 8vFzX... has been active for 234 days.
-	Current balance: 12.4 SOL, 1,200 USDC, and 50k BONK.
-	Last transaction: 2 hours ago (sent 0.1 SOL to Jupiter).
+Bot:  Wallet: 8vFzX...
+	Active for: 234 days
+
+	Balances:
+	- 12.4 SOL
+	- 1,200 USDC
+	- 50k BONK
+
+	Last transaction:
+	- Time: 2 hours ago
+	- Summary: sent 0.1 SOL to Jupiter
 	Risk assessment: No interactions with known scam contracts. ✅
 	Always DYOR — this is not financial advice.
 

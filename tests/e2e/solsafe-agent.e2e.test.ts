@@ -102,9 +102,17 @@ describe('solsafe agent e2e flows', () => {
     expect(walletTurn.intent).toBe(SOLSAFE_INTENTS.WALLET_LOOKUP);
     expect(walletTurn.response).toBe(
       [
-        `Wallet ${WALLET_ADDRESS} has been active for 234 days.`,
-        'Current balance: 12.4 SOL, 1,200 USDC, and 50k BONK.',
-        'Last transaction: 2 hours ago (sent 0.1 SOL to Jupiter).',
+        `Wallet: ${WALLET_ADDRESS}`,
+        'Active for: 234 days',
+        '',
+        'Balances:',
+        '- 12.4 SOL',
+        '- 1,200 USDC',
+        '- 50k BONK',
+        '',
+        'Last transaction:',
+        '- Time: 2 hours ago',
+        '- Summary: sent 0.1 SOL to Jupiter',
         'Recent transactions: 12 recent signatures observed.',
         'Risk assessment: No interactions with known scam contracts. ✅',
         SOLSAFE_DYOR_DISCLAIMER,

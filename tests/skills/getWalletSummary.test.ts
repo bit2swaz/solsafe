@@ -8,7 +8,7 @@ import {
 } from '../../src/skills/getWalletSummary.js';
 
 describe('getWalletSummary skill', () => {
-  it('formats a wallet summary that matches the SSOT conversation example fields', async () => {
+  it('formats a wallet summary as a clean multi-line Telegram-friendly block', async () => {
     const walletAddress = 'GDEkQF7UMr7RLv1KQKMtm8E2w3iafxJLtyXu3HVQZnME';
     const getWalletSummarySnapshot = vi.fn().mockResolvedValue({
       walletAddress,
@@ -39,9 +39,17 @@ describe('getWalletSummary skill', () => {
       walletAddress,
       cached: false,
       summary: [
-        `Wallet ${walletAddress} has been active for 234 days.`,
-        'Current balance: 12.4 SOL, 1,200 USDC, and 50k BONK.',
-        'Last transaction: 2 hours ago (sent 0.1 SOL to Jupiter).',
+        `Wallet: ${walletAddress}`,
+        'Active for: 234 days',
+        '',
+        'Balances:',
+        '- 12.4 SOL',
+        '- 1,200 USDC',
+        '- 50k BONK',
+        '',
+        'Last transaction:',
+        '- Time: 2 hours ago',
+        '- Summary: sent 0.1 SOL to Jupiter',
         'Recent transactions: 12 recent signatures observed.',
         'Risk assessment: No interactions with known scam contracts. ✅',
       ].join('\n'),

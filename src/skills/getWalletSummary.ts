@@ -244,9 +244,13 @@ function formatWalletSummary(snapshot: WalletSummarySnapshot): string {
   );
 
   return [
-    `Wallet ${snapshot.walletAddress} has been active for ${snapshot.walletAgeDays} days.`,
-    formatBalanceLine(snapshot.solBalance, snapshot.tokenHoldings),
-    `Last transaction: ${formatRecentTransaction(snapshot.recentTransaction)}.`,
+    `Wallet: ${snapshot.walletAddress}`,
+    `Active for: ${snapshot.walletAgeDays} days`,
+    '',
+    'Balances:',
+    ...formatBalanceLines(snapshot.solBalance, snapshot.tokenHoldings),
+    '',
+    ...formatRecentTransactionLines(snapshot.recentTransaction),
     ...(recentTransactionCountLine ? [recentTransactionCountLine] : []),
     SSOT_RISK_ASSESSMENT_LINE,
   ].join('\n');
@@ -265,43 +269,33 @@ function formatRecentTransactionCountLine(
   return `Recent transactions: ${Math.max(0, Math.round(recentTransactionCount))} recent signatures observed.`;
 }
 
-function formatBalanceLine(
+function formatBalanceLines(
   solBalance: number,
   tokenHoldings: WalletTokenHolding[],
-): string {
-  const balanceParts = [
-    `${formatAmount(solBalance)} SOL`,
+): string[] {
+  return [
+    `- ${formatAmount(solBalance)} SOL`,
     ...tokenHoldings
-      .slice()
       .slice(0, 3)
-      .map((holding) => `${formatAmount(holding.amount)} ${holding.symbol}`),
+      .map((holding) => `- ${formatAmount(holding.amount)} ${holding.symbol}`),
   ];
-
-  return `Current balance: ${joinWithOxfordComma(balanceParts)}.`;
 }
 
-function formatRecentTransaction(transaction: WalletRecentTransaction): string {
-  if (!transaction.summary) {
-    return 'No recent transactions found';
+function formatRecentTransactionLines(
+  transaction: WalletRecentTransaction,
+): string[] {
+  if (
+    !transaction.summary ||
+    transaction.summary === 'No recent transactions found'
+  ) {
+    return ['Last transaction: No recent transactions found.'];
   }
 
-  return `${transaction.relativeTime} (${transaction.summary})`;
-}
-
-function joinWithOxfordComma(items: string[]): string {
-  if (items.length === 0) {
-    return '0 SOL';
-  }
-
-  if (items.length === 1) {
-    return items[0];
-  }
-
-  if (items.length === 2) {
-    return `${items[0]} and ${items[1]}`;
-  }
-
-  return `${items.slice(0, -1).join(', ')}, and ${items.at(-1)}`;
+  return [
+    'Last transaction:',
+    `- Time: ${transaction.relativeTime}`,
+    `- Summary: ${transaction.summary}`,
+  ];
 }
 
 function formatAmount(amount: number): string {

@@ -146,4 +146,75 @@ describe('telegram webhook server', () => {
       secret_token: WEBHOOK_SECRET,
     });
   });
+
+  it('acknowledges webhook updates immediately and ignores duplicate update ids while processing', async () => {
+    const webhookUrl = 'https://example.com/telegram/webhook';
+    const duplicateUpdate = {
+      update_id: 99,
+      message: {
+        chat: {
+          id: 42,
+          type: 'private',
+        },
+        date: 1,
+        from: {
+          first_name: 'Test',
+          id: 42,
+          is_bot: false,
+        },
+        message_id: 1,
+        text: 'check wallet GDEkQF7UMr7RLv1KQKMtm8E2w3iafxJLtyXu3HVQZnME',
+      },
+    };
+    let releaseUpdateProcessing: (() => void) | undefined;
+    const updateProcessingStarted = Promise.withResolvers<void>();
+    const updateProcessingReleased = new Promise<void>((resolve) => {
+      releaseUpdateProcessing = resolve;
+    });
+    const handleUpdate = vi.fn(async () => {
+      updateProcessingStarted.resolve();
+      await updateProcessingReleased;
+    });
+    const bot = {
+      api: {
+        setWebhook: vi.fn(),
+      },
+      handleUpdate,
+    } as unknown as Bot;
+    const server = createTelegramServer({
+      bot,
+      webhookSecret: WEBHOOK_SECRET,
+      webhookUrl,
+    });
+
+    const baseUrl = await listen(server);
+    const firstResponse = await fetch(`${baseUrl}${getWebhookPath(webhookUrl)}`, {
+      body: JSON.stringify(duplicateUpdate),
+      headers: {
+        'content-type': 'application/json',
+        'x-telegram-bot-api-secret-token': WEBHOOK_SECRET,
+      },
+      method: 'POST',
+    });
+
+    expect(firstResponse.status).toBe(200);
+    await updateProcessingStarted.promise;
+
+    const duplicateResponse = await fetch(
+      `${baseUrl}${getWebhookPath(webhookUrl)}`,
+      {
+        body: JSON.stringify(duplicateUpdate),
+        headers: {
+          'content-type': 'application/json',
+          'x-telegram-bot-api-secret-token': WEBHOOK_SECRET,
+        },
+        method: 'POST',
+      },
+    );
+
+    expect(duplicateResponse.status).toBe(200);
+    expect(handleUpdate).toHaveBeenCalledTimes(1);
+
+    releaseUpdateProcessing?.();
+  });
 });
