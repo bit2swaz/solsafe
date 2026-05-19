@@ -6,6 +6,7 @@ import {
   SOLSAFE_MEMORY_KEY,
   createSolsafeAgent,
   executeSolsafeTurn,
+  type SolsafeSkill,
   type SolsafeRateLimiter,
 } from '../../src/agents/solsafe-agent.js';
 import {
@@ -180,5 +181,42 @@ describe('solsafe agent', () => {
     expect(turn.response).not.toContain('whale alert');
     expect(turn.response).not.toContain('wallet risk');
     expect(turn.response).not.toContain('swap preview');
+  });
+
+  it('does not fall back to stale memory when a new token symbol is explicitly named but unresolved', async () => {
+    const execute = vi.fn();
+    const tokenSkill: SolsafeSkill<{ mintAddress: string }, { summary: string }> = {
+      description: 'Checks token safety',
+      execute,
+      intent: SOLSAFE_INTENTS.TOKEN_SECURITY,
+      name: CHECK_TOKEN_SECURITY_SKILL_NAME,
+    };
+    const memory = {
+      memoryKeys: [SOLSAFE_MEMORY_KEY],
+      loadMemoryVariables: vi.fn().mockResolvedValue({
+        [SOLSAFE_MEMORY_KEY]: [
+          {
+            content: 'BONK (mint: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263)',
+          },
+        ],
+      }),
+      saveContext: vi.fn().mockResolvedValue(undefined),
+    } as unknown as BaseMemory;
+    const agent = createSolsafeAgent({
+      memory,
+      rateLimiter: createRateLimiterStub(),
+      skills: [tokenSkill],
+    });
+
+    await expect(
+      executeSolsafeTurn({
+        agent,
+        message: 'what about the PEPE token? is it safe?',
+        userId: 'telegram:1234',
+      }),
+    ).rejects.toThrow(
+      "I couldn't resolve PEPE to a token mint address. Send the mint address to run a token security check.",
+    );
+    expect(execute).not.toHaveBeenCalled();
   });
 });

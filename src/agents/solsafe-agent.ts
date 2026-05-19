@@ -124,6 +124,21 @@ const WHALE_ALERT_PATTERNS = [
   /\bmonitor whale\b/i,
   /\blarge movements?\b/i,
 ];
+const TOKEN_REFERENCE_PATTERNS = [
+  /\b([A-Za-z][A-Za-z0-9._-]{1,31})\s+token\b/i,
+  /\btoken\s+([A-Za-z][A-Za-z0-9._-]{1,31})\b/i,
+];
+const TOKEN_REFERENCE_STOPWORDS = new Set([
+  'A',
+  'AN',
+  'MY',
+  'SAFE',
+  'THE',
+  'THIS',
+  'THAT',
+  'TOKEN',
+  'YOUR',
+]);
 
 const SOLANA_ADDRESS_PATTERN = /\b[A-HJ-NP-Za-km-z1-9]{32,44}\b/g;
 const SERIALIZED_TRANSACTION_PATTERN = /[A-Za-z0-9+/=]{80,}/g;
@@ -423,6 +438,14 @@ function resolveTokenMintAddress(message: string, memoryValue: unknown): string 
     return currentMessageMint;
   }
 
+  const explicitTokenReference = extractExplicitTokenReference(message);
+
+  if (explicitTokenReference) {
+    throw new Error(
+      `I couldn't resolve ${explicitTokenReference} to a token mint address. Send the mint address to run a token security check.`,
+    );
+  }
+
   for (const memoryMessage of extractMemoryMessages(memoryValue).reverse()) {
     const memoryMintAddress = findFirstMatch(memoryMessage, SOLANA_ADDRESS_PATTERN);
 
@@ -449,6 +472,26 @@ function findKnownTokenMint(message: string): string | null {
     if (symbolPattern.test(message)) {
       return mintAddress;
     }
+  }
+
+  return null;
+}
+
+function extractExplicitTokenReference(message: string): string | null {
+  for (const pattern of TOKEN_REFERENCE_PATTERNS) {
+    const tokenReference = pattern.exec(message)?.[1]?.trim();
+
+    if (!tokenReference) {
+      continue;
+    }
+
+    const normalizedTokenReference = tokenReference.toUpperCase();
+
+    if (TOKEN_REFERENCE_STOPWORDS.has(normalizedTokenReference)) {
+      continue;
+    }
+
+    return normalizedTokenReference;
   }
 
   return null;

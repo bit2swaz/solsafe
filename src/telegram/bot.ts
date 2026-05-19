@@ -128,26 +128,48 @@ export async function handleTextMessage(
   const executeTurn = dependencies.executeTurn ?? executeSolsafeTurn;
   const queryHistoryStore =
     dependencies.queryHistoryStore ?? createSupabaseQueryHistoryStore();
-  const turn = await executeTurn({
-    agent,
-    message,
-    sessionId,
-    userId,
-  });
-  const responseSummary = appendSolsafeSafetyDisclaimer(turn.response);
 
-  await queryHistoryStore.saveQueryHistoryEntry({
-    intent: turn.intent,
-    metadata: {
-      skillName: turn.skillName,
-      source: 'telegram',
-    },
-    queryText: message,
-    responseSummary,
-    sessionId,
-    userId,
-  });
-  await ctx.reply(responseSummary);
+  try {
+    const turn = await executeTurn({
+      agent,
+      message,
+      sessionId,
+      userId,
+    });
+    const responseSummary = appendSolsafeSafetyDisclaimer(turn.response);
+
+    await ctx.reply(responseSummary);
+    await queryHistoryStore.saveQueryHistoryEntry({
+      intent: turn.intent,
+      metadata: {
+        skillName: turn.skillName,
+        source: 'telegram',
+      },
+      queryText: message,
+      responseSummary,
+      sessionId,
+      userId,
+    });
+  } catch (error) {
+    const intent = agent.routeIntent(message);
+    const responseSummary = appendSolsafeSafetyDisclaimer(
+      formatTelegramTurnError(error),
+    );
+
+    await ctx.reply(responseSummary);
+    await queryHistoryStore.saveQueryHistoryEntry({
+      intent,
+      metadata: {
+        error: true,
+        skillName: agent.getSkillForIntent(intent)?.name ?? null,
+        source: 'telegram',
+      },
+      queryText: message,
+      responseSummary,
+      sessionId,
+      userId,
+    });
+  }
 }
 
 export function getBotToken(env: NodeJS.ProcessEnv = process.env): string {
@@ -231,4 +253,30 @@ function getTelegramSessionId(ctx: TextMessageHandlerContext): string {
   }
 
   return `telegram-chat:${String(chatId)}`;
+}
+
+function formatTelegramTurnError(error: unknown): string {
+  const errorMessage = error instanceof Error ? error.message.trim() : '';
+
+  if (/valid base64-encoded Solana transaction/i.test(errorMessage)) {
+    return 'I could not parse that transaction. Send the full base64-encoded Solana transaction you want simulated.';
+  }
+
+  if (/I couldn't resolve .* token mint address/i.test(errorMessage)) {
+    return errorMessage;
+  }
+
+  if (/token mint address or known token symbol is required/i.test(errorMessage)) {
+    return 'I could not resolve that token. Send the token mint address to run a token security check.';
+  }
+
+  if (/At least one Solana program log line is required/i.test(errorMessage)) {
+    return 'I could not find any Solana program log lines in that message. Paste the raw logs you want explained.';
+  }
+
+  if (/valid Solana wallet address/i.test(errorMessage)) {
+    return 'I could not find a valid Solana wallet address in that message. Send the wallet address you want inspected.';
+  }
+
+  return 'I could not complete that request. Please try again with a wallet address, token mint, base64 transaction, or raw program logs.';
 }

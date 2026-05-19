@@ -235,4 +235,62 @@ describe('telegram bot', () => {
       }),
     );
   });
+
+  it('replies with a user-facing error when transaction simulation input is invalid', async () => {
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const executeTurn = vi
+      .fn()
+      .mockRejectedValue(
+        new Error('A valid base64-encoded Solana transaction is required.'),
+      );
+    const saveQueryHistoryEntry = vi.fn().mockResolvedValue({
+      id: 'history-row-id',
+    });
+    const agent = {
+      getSkillForIntent: vi.fn().mockReturnValue({
+        name: 'simulateTransaction',
+      }),
+      routeIntent: vi.fn().mockReturnValue(
+        SOLSAFE_INTENTS.TRANSACTION_SIMULATION,
+      ),
+    } as unknown as SolsafeAgent;
+
+    await handleTextMessage({
+      chat: { id: 21 },
+      from: { id: 7 },
+      message: {
+        text: 'can you simulate this transaction before i sign it? bad-transaction',
+      },
+      reply,
+    } as never, {
+      agent,
+      executeTurn,
+      queryHistoryStore: {
+        listRecentQueryHistory: vi.fn(),
+        saveQueryHistoryEntry,
+      } as unknown as QueryHistoryStore,
+    });
+
+    expect(reply).toHaveBeenCalledWith(
+      [
+        'I could not parse that transaction. Send the full base64-encoded Solana transaction you want simulated.',
+        'Always DYOR — this is not financial advice.',
+      ].join('\n'),
+    );
+    expect(saveQueryHistoryEntry).toHaveBeenCalledWith({
+      intent: SOLSAFE_INTENTS.TRANSACTION_SIMULATION,
+      metadata: {
+        error: true,
+        skillName: 'simulateTransaction',
+        source: 'telegram',
+      },
+      queryText: 'can you simulate this transaction before i sign it? bad-transaction',
+      responseSummary: [
+        'I could not parse that transaction. Send the full base64-encoded Solana transaction you want simulated.',
+        'Always DYOR — this is not financial advice.',
+      ].join('\n'),
+      sessionId: 'telegram-chat:21',
+      userId: 'telegram:7',
+    });
+  });
 });
