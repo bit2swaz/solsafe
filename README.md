@@ -66,7 +66,7 @@ To link a Telegram identity for MVP testing:
 
 ## Prerequisites
 
-- Node.js 20 or newer.
+- Node.js 22.20.0.
 - An npm-compatible environment.
 - A Telegram bot token from BotFather.
 - A Telegram webhook secret that you generate yourself.
@@ -179,12 +179,14 @@ npm test
 The bot deployment blueprint is defined in [render.yaml](render.yaml). Create a Render web service from this repo or apply the blueprint directly.
 
 - Runtime: Node web service on the free plan.
-- Build command: `npm install --legacy-peer-deps && npm run build`
+- Node version: `22.20.0` via `NODE_VERSION` in the Render blueprint.
+- Build command: `npm install --legacy-peer-deps --include=dev && npm run build`
 - Start command: `npm run start`
 - Health check: `/health`
 
 Required Render environment variables:
 
+- `NODE_VERSION`
 - `BOT_TOKEN`
 - `TELEGRAM_WEBHOOK_SECRET`
 - `WEBHOOK_URL`

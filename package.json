@@ -5,14 +5,14 @@
   "description": "SolSafe project scaffold aligned to docs/SSOT.md",
   "type": "module",
   "engines": {
-    "node": ">=20.0.0"
+    "node": "22.20.0"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/src/index.js",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@langchain/community": "1.1.28",

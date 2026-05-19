@@ -3,7 +3,7 @@ services:
     name: solsafe-bot
     runtime: node
     plan: free
-    buildCommand: npm install --legacy-peer-deps && npm run build
+    buildCommand: npm install --legacy-peer-deps --include=dev && npm run build
     startCommand: npm run start
     healthCheckPath: /health
     autoDeploy: true
@@ -13,10 +13,13 @@ services:
         - package.json
         - package-lock.json
         - tsconfig.json
+        - tsconfig.build.json
         - render.yaml
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 22.20.0
       - key: BOT_TOKEN
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET
